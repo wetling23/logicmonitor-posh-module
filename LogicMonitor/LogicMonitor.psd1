@@ -4,7 +4,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.0.21'
+ModuleVersion = '1.0.0.16'
 
 # ID used to uniquely identify this module
 GUID = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -13,7 +13,7 @@ GUID = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
 Author = 'Mike Hashemi'
 
 # Company or vendor of this module
-CompanyName = 'Synoptek'
+CompanyName = 'Synoptek,'
 
 # Copyright statement for this module
 Copyright = '(c) 2017 mhashemi. All rights reserved.'
@@ -94,13 +94,13 @@ PrivateData = @{
         # LicenseUri = ''
 
         # A URL to the main website for this project.
-        ProjectUri = 'https://github.com/wetling23/logicmonitor-posh-module'
+        # ProjectUri = ''
 
         # A URL to an icon representing this module.
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Remove-LogicMonitorDevice to 1.0.0.4.'
+        ReleaseNotes = 'Updated Get-LogicMonitorCollectorInstaller to 1.0.0.8.'
 
         # External dependent modules of this module
         # ExternalModuleDependencies = ''

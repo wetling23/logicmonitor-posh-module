@@ -94,7 +94,7 @@ PrivateData = @{
         # LicenseUri = ''
 
         # A URL to the main website for this project.
-        ProjectUri = 'https://github.com/wetling23/logicmonitor-posh-module'
+        # ProjectUri = 'https://github.com/wetling23/logicmonitor-posh-module'
 
         # A URL to an icon representing this module.
         # IconUri = ''
