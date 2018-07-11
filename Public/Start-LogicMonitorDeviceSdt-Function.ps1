@@ -5,7 +5,9 @@
         .NOTES 
             Author: Mike Hashemi
             V1.0.0.0 date: 9 July 2018
-                - Initial release
+                - Initial release.
+            V1.0.0.1 date: 11 July 2018
+                - Updated code to handle times better.
         .LINK
 
         .PARAMETER AccessId
@@ -62,6 +64,7 @@
 
         [datetime]$StartDate,
 
+        [ValidateScript( {$_ -match '^([01]\d|2[0-3]):?([0-5]\d)$'})]
         [datetime]$StartTime,
 
         [ValidateScript( {$_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'})]
@@ -80,7 +83,7 @@
         $resourcePath = "/sdt/sdts"
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-        $comment += "...SDT initiated via Start-LogicMonitorCommentSdt."
+        $comment += "...SDT initiated via Start-LogicMonitorCommentSdt"
     }
     Process {
         If (-NOT($BlockLogging)) {
@@ -100,7 +103,7 @@
         $message = ("{0}: Validating start time/date." -f (Get-Date -Format s))
         If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        If (($StartDate -eq $null) -and ($StartTime -eq $null)) {
+        If (-NOT($StartDate) -and -NOT($StartTime)) {
             # Neither start time nor end time provided.
 
             $message = ("{0}: StartDate and StartTime are null." -f (Get-Date -Format s))
@@ -108,28 +111,28 @@
 
             $StartDate = (Get-Date).AddMinutes(1)
         }
-        ElseIf (($StartDate -eq $null) -and ($StartTime -ne $null)) {
+        ElseIf (-NOT($StartDate) -and ($StartTime)) {
             # Start date not provided. Start time is provided.
             $message = ("{0}: StartDate is null and StartTime is {1}." -f (Get-Date -Format s), $StartTime)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $StartDate = (Get-Date -Format d)
-            [datetime]$StartDate = $StartDate
-            $StartDate = $StartDate.Add([System.Timespan]::Parse($StartTime))
+            $StartDate = Get-Date
+            $StartDate = $StartDate.Date.Add((New-Timespan -Hour $StartTime.Split(':')[0] -Minute $StartTime.Split(':')[0]))
         }
-        ElseIf (($StartDate -ne $null) -and ($StartTime -eq $null)) {
+        ElseIf (($StartDate) -and -NOT($StartTime)) {
             # Start date is provided. Start time is not provided.
             $message = ("{0}: StartDate is {1} and StartTime is null. The object type of StartDate is {2}" -f (Get-Date -Format s), $StartDate, $StartDate.GetType())
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            [datetime]$StartDate = $StartDate
-            $StartDate = $StartDate.Add([System.Timespan]::Parse((Get-Date -Format HH:mm).ToString()))
+            $currentTime = (Get-Date).AddMinutes(1)
+            $StartDate = $StartDate.Date.Add((New-Timespan -Hour $currentTime.Hour -Minute $currentTime.Minute))
         }
         Else {
+            # Start date is provided. Start time is provided.
             $message = ("{0}: StartDate is {1} and StartTime is {2}." -f (Get-Date -Format s), $StartDate, $StartTime)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $StartDate = $StartDate.Add([System.Timespan]::Parse($StartTime))
+            $StartDate = $StartDate.Date.Add([Timespan]::Parse($StartTime))
         }
 
         # Split the duration into days, hours, and minutes.
@@ -203,4 +206,4 @@
             Return $response.status
         }
     }
-} #1.0.0.0
+} #1.0.0.1
