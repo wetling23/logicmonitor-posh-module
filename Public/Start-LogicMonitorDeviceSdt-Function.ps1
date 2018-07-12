@@ -8,6 +8,9 @@
                 - Initial release.
             V1.0.0.1 date: 11 July 2018
                 - Updated code to handle times better.
+            V1.0.0.2 date: 12 July 2018
+                - Changed the variable cast of $StartTime from [datetime] to [string].
+                - Changed references to "LogicMonitorCommentSdt", to "LogicMonitorDeviceSdt".
         .LINK
 
         .PARAMETER AccessId
@@ -27,7 +30,7 @@
         .PARAMETER Duration
             Represents the duration of SDT in the format days, hours, minutes (xxx:xx:xx). If no value is provided, the duration will be one hour.
         .PARAMETER Comment
-            Represents the text that will show in the notes field of the SDT entry. The text "...SDT initiated via Start-LogicMonitorCommentSdt." will be appended to the user's comment.
+            Represents the text that will show in the notes field of the SDT entry. The text "...SDT initiated via Start-LogicMonitorDeviceSdt." will be appended to the user's comment.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule". Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -39,11 +42,11 @@
         .EXAMPLE
             PS C:\> Start-LogicMonitorDeviceSdt -AccessId $accessID -AccessKey $accessKey -AccountName <account name> -Id 1 -StartDate 06/07/2050 -Duration 00:02:00 -Comment "Testing" 
 
-            In this example, SDT will be started for the device with Id "1". The SDT will start on 7 June 2050 (at the time the command was run). The duraction will be two hours and the comment will be "Testing......SDT initiated via Start-LogicMonitorCommentSdt.".
+            In this example, SDT will be started for the device with Id "1". The SDT will start on 7 June 2050 (at the time the command was run). The duraction will be two hours and the comment will be "Testing......SDT initiated via Start-LogicMonitorDeviceSdt.".
         .EXAMPLE
             PS C:\> Get-LogicMonitorDevices -AccessId $accessID -AccessKey $accessKey -AccountName <account name> -DeviceId 1 | Start-LogicMonitorDeviceSdt -AccessId $accessID -AccessKey $accessKey -AccountName <account name> -StartDate 06/07/2050 -Duration 00:02:00 -Comment "Testing" 
 
-            In this example, SDT will be started for the device with Id "1". The SDT will start on 7 June 2050 (at the time the command was run). The duraction will be two hours and the comment will be "Testing......SDT initiated via Start-LogicMonitorCommentSdt.".
+            In this example, SDT will be started for the device with Id "1". The SDT will start on 7 June 2050 (at the time the command was run). The duraction will be two hours and the comment will be "Testing......SDT initiated via Start-LogicMonitorDeviceSdt.".
     #>
     [CmdletBinding()]
     Param (
@@ -65,7 +68,7 @@
         [datetime]$StartDate,
 
         [ValidateScript( {$_ -match '^([01]\d|2[0-3]):?([0-5]\d)$'})]
-        [datetime]$StartTime,
+        [string]$StartTime,
 
         [ValidateScript( {$_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'})]
         [string]$Duration = "00:01:00",
@@ -83,7 +86,7 @@
         $resourcePath = "/sdt/sdts"
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-        $comment += "...SDT initiated via Start-LogicMonitorCommentSdt"
+        $comment += "...SDT initiated via Start-LogicMonitorDeviceSdt"
     }
     Process {
         If (-NOT($BlockLogging)) {
@@ -206,4 +209,4 @@
             Return $response.status
         }
     }
-} #1.0.0.1
+} #1.0.0.2
