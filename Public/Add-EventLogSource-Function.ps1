@@ -47,7 +47,7 @@ Function Add-EventLogSource {
             Write-Host $message -ForegroundColor White
             
             Try {
-                Start-Process PowerShell –Verb RunAs -ArgumentList "New-EventLog –LogName Application –Source $EventLogSource -ErrorAction Stop"
+                Start-Process PowerShell -Verb RunAs -ArgumentList "New-EventLog -LogName Application -Source $EventLogSource -ErrorAction Stop"
             }
             Catch [System.InvalidOperationException] {
                 $message = ("{0}: It appears that the user cancelled the operation." -f (Get-Date -Format s))
