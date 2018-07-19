@@ -9,6 +9,8 @@ Function Update-LogicMonitorCollectorProperties {
             V1.0.0.1 date: 19 July 2018
                 - Added support for both PUT and PATCH operations.
                 - Updated how the $propertyData is built, based on input from Joe Tran (https://github.com/jtran1209/).
+            V1.0.0.2 date: 19 July 2018
+                - Removed mandatory flag from OpType.
         .LINK
 
         .PARAMETER AccessId
@@ -60,7 +62,6 @@ Function Update-LogicMonitorCollectorProperties {
         [Parameter(Mandatory = $True)]
         [string[]]$PropertyValues,
 
-        [Parameter(Mandatory = $True)]
         [ValidateSet('PUT', 'PATCH')]
         [string]$OpType = 'PATCH',
 
@@ -172,7 +173,7 @@ Function Update-LogicMonitorCollectorProperties {
                 -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
-        Return "Error",$response
+        Return "Error", $response
     }
 
     If ($response.status -ne "200") {
@@ -181,4 +182,4 @@ Function Update-LogicMonitorCollectorProperties {
     }
 
     Return $response
-} #1.0.0.1
+} #1.0.0.2
