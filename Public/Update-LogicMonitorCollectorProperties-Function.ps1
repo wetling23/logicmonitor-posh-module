@@ -1,11 +1,14 @@
 Function Update-LogicMonitorCollectorProperties {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Accepts a collector ID or description and one or more property name/value pairs, then updates the property(ies).
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 11 July 2018
                 - Initial release.
+            V1.0.0.1 date: 19 July 2018
+                - Added support for both PUT and PATCH operations.
+                - Updated how the $propertyData is built, based on input from Joe Tran (https://github.com/jtran1209/).
         .LINK
 
         .PARAMETER AccessId
@@ -24,6 +27,8 @@ Function Update-LogicMonitorCollectorProperties {
             Represents the value of the target property.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
+        .PARAMETER OpType
+            Default value is "PATCH". Defines whether the command should use PUT or PATCH. PUT updates the provided properties and returns the rest to default values while PATCH updates the provided properties without chaning the others.
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
@@ -49,11 +54,15 @@ Function Update-LogicMonitorCollectorProperties {
         [string]$CollectorDisplayName,
 
         [Parameter(Mandatory = $True)]
-        [ValidateSet('description', 'backupAgentId', 'enableFailBack', 'resendIval', 'suppressAlertClear', 'escalatingChainId', 'collectorGroupId', 'collectorGroupName', 'enableFailOverOnCollectorDevice')]
+        [ValidateSet('description', 'backupAgentId', 'enableFailBack', 'resendIval', 'suppressAlertClear', 'escalatingChainId', 'collectorGroupId', 'collectorGroupName', 'enableFailOverOnCollectorDevice', 'build')]
         [string[]]$PropertyNames,
 
         [Parameter(Mandatory = $True)]
         [string[]]$PropertyValues,
+
+        [Parameter(Mandatory = $True)]
+        [ValidateSet('PUT', 'PATCH')]
+        [string]$OpType = 'PATCH',
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -62,7 +71,7 @@ Function Update-LogicMonitorCollectorProperties {
 
     If (-NOT($BlockLogging)) {
         $return = Add-EventLogSource -EventLogSource $EventLogSource
-    
+
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
@@ -76,11 +85,11 @@ Function Update-LogicMonitorCollectorProperties {
 
     # Initialize variables.
     [int]$index = 0
-    [string]$propertyData = ""
+    [hashtable]$propertyData = @{}
     [string]$standardProperties = ""
     [string]$data = ""
-    [string]$httpVerb = 'PUT'
-    [string]$queryParams = ""
+    [string]$httpVerb = $OpType.ToUpper()
+    [string]$queryParams = "?patchFields="
     [string]$resourcePath = "/setting/collectors"
     [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
@@ -107,13 +116,25 @@ Function Update-LogicMonitorCollectorProperties {
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
     Foreach ($property in $PropertyNames) {
-        $propertyData += "{`"$property`":`"$($PropertyValues[$index])`"}"
+        If ($OpType -eq 'PATCH') {
+            $queryParams += "$property,"
+
+            $message = ("{0}: Added {1} to `$queryParams. The new value of `$queryParams is: {2}" -f (Get-Date -Format s), $property, $queryParams)
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+        }
+
+        $propertyData.add($property, $PropertyValues[$index])
 
         $index++
     }
 
+    If ($OpType -eq 'PATCH') {
+        $queryParams = $queryParams.TrimEnd(",")
+        $queryParams += "&opType=replace"
+    }
+
     # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
-    $data = $propertyData
+    $data = $propertyData | ConvertTo-Json -Depth 6
 
     $message = ("{0}: Finished updating `$data. The value update is {1}." -f (Get-Date -Format s), $data)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -151,13 +172,13 @@ Function Update-LogicMonitorCollectorProperties {
                 -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
-        Return "Error"
+        Return "Error",$response
     }
-    
+
     If ($response.status -ne "200") {
         $message = ("{0}: LogicMonitor reported an error (status {1}). The message is: {2}" -f (Get-Date -Format s), $response.status, $response.errmsg)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
     }
 
     Return $response
-} #1.0.0.0
+} #1.0.0.1
