@@ -1,9 +1,8 @@
-﻿###Need to update the help in for the "id"/"deviceid" parameter.
-Function Update-LogicMonitorDeviceProperties {
+﻿Function Update-LogicMonitorDeviceProperties {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Accepts a device ID, display name, or device IP/DNS name, and one or more property name/value pairs, then updates the property(ies).
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 12 December 2016
             V1.0.0.1 date: 31 January 2017
@@ -35,6 +34,9 @@ Function Update-LogicMonitorDeviceProperties {
             V1.0.0.12 date: 11 July 2018
                 - Updated white space.
                 - Updated in-line help.
+            V1.0.0.13 date: 18 July 2018
+                - More whites space updates.
+                - Added the API's response to the return data when there is an Invoke-RestMethod failure.
         .LINK
 
         .PARAMETER AccessId
@@ -156,7 +158,7 @@ Function Update-LogicMonitorDeviceProperties {
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
-            }			
+            }
 
             $resourcePath += "/$($device.id)"
 
@@ -167,9 +169,9 @@ Function Update-LogicMonitorDeviceProperties {
 
     $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f (Get-Date -Format s), $resourcePath)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
-    
+
     # For each property, assign the name and value to $propertyData.
-    Foreach ($property in $PropertyNames) {    
+    Foreach ($property in $PropertyNames) {
         Switch ($property) {
             {$_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId")} {
                 $queryParams += "$property,"
@@ -210,7 +212,7 @@ Function Update-LogicMonitorDeviceProperties {
         $queryParams += "customProperties&opType=replace"
     }
     Else {
-        $queryParams.TrimEnd(",")
+        $queryParams = $queryParams.TrimEnd(",")
         $queryParams += "&opType=replace"
     }
 
@@ -269,8 +271,8 @@ Function Update-LogicMonitorDeviceProperties {
         $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
                 -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
-        
-        Return "Error"
+
+        Return "Error", $response
     }
 
     If ($response.status -ne "200") {
@@ -279,4 +281,4 @@ Function Update-LogicMonitorDeviceProperties {
     }
 
     Return $response
-} #1.0.0.12
+} #1.0.0.13
