@@ -6,6 +6,9 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 10 August 2018
                 - Initial release.
+            V1.0.0.1 date: 7 September 2018
+                - Fixed bug preventing correct history output.
+                - Fixed bug stopping the retrieval loop prematurely.
         .LINK
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
@@ -68,7 +71,7 @@
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     # Determine how many times "GET" must be run, to return all alert rules, then loop through "GET" that many times.
-    While ($currentBatchNum -lt $batchCount) {
+    While ($currentBatchNum -le $batchCount) {
         $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
         # Construct the query URL.
@@ -95,6 +98,7 @@
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
             $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
             $headers.Add("Content-Type", 'application/json')
+            $headers.Add("X-Version", '2')
         }
 
         # Make Request
@@ -112,7 +116,7 @@
             Return
         }
 
-        $histories += $response.data.items
+        $histories += $response.items
 
         $message = ("{0}: There are {1} alert rules in `$histories." -f (Get-Date -Format s), $($histories.count))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -143,4 +147,4 @@
     }
 
     Return $histories
-} #1.0.0.0
+} #1.0.0.1
