@@ -1,4 +1,3 @@
-##does not work yet. It seems that the API accepts the request, but does not take any action.
 Function Update-LogicMonitorCollectorVersion {
     <#
         .DESCRIPTION
@@ -72,12 +71,11 @@ Function Update-LogicMonitorCollectorVersion {
 
     Begin {
         # Initialize variables.
-        [int]$index = 0
+        [hashtable]$upgradeProperties = @{}
         [hashtable]$propertyData = @{}
-        [string]$standardProperties = ""
         [string]$data = ""
         [string]$httpVerb = "PATCH"
-        [string]$queryParams = "?patchFields=onetimeUpgradeInfo"
+        [string]$queryParams = ""
         [string]$resourcePath = "/setting/collectors"
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
@@ -143,12 +141,17 @@ Function Update-LogicMonitorCollectorVersion {
         $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
+        # Sleeping because we get an error about scheduling, if we don't wait.
+        Start-Sleep -Seconds 5
+
         $propertyData = @{
             "majorVersion" = $MajorVersion
             "minorVersion" = $MinorVersion
             "startEpoch"   = $startEpoch
             "description"  = "Collector upgrade initiated by LogicMonitor PowerShell module."
         }
+
+        $propertyData.Add("onetimeUpgradeInfo", $upgradeProperties)
 
         # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
         $data = $propertyData | ConvertTo-Json -Depth 6
@@ -176,6 +179,7 @@ Function Update-LogicMonitorCollectorVersion {
         $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
         $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
         $headers.Add("Content-Type", 'application/json')
+        $headers.Add("X-Version", '2')
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
