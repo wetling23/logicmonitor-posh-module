@@ -6,6 +6,9 @@ Function Update-LogicMonitorCollectorVersion {
             Author: Mike Hashemi
             V1.0.0.0 date: 30 August 2018
                 - Initial release.
+            V1.0.0.1 date: 7 September 2018
+                - Updated in-line documents.
+                - Removed $StartTime. We still support the idea, just with different syntax. See examples.
         .LINK
 
         .PARAMETER AccessId
@@ -16,16 +19,14 @@ Function Update-LogicMonitorCollectorVersion {
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER CollectorId
             Represents the collector's ID.
-        .PARAMETER DisplayName
+        .PARAMETER Description
             Represents the collectors description.
         .PARAMETER MajorVersion
-            
+            Represents the major version of the collector to install (e.g. 27)
         .PARAMETER MinorVersion
-            
+            Represents the minor version of the collector to install (e.g. 2). Valid values are 0-999.
         .PARAMETER StartDate
-
-        .PARAMETER StartTime
-
+            Represents the upgrade start date and time. If no value is provided, the current date and time are.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -33,11 +34,15 @@ Function Update-LogicMonitorCollectorVersion {
         .EXAMPLE
             PS C:\> Update-LogicMonitorCollectorVersion -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -CollectorId 6 -MajorVersion 27 -MinorVersion 2
 
-            In this example, the cmdlet will upgrade the collector to 27.002. The installation will run immediately.
+            In this example, the cmdlet will upgrade the collector to 27.002. The installation will be scheduled to run immediately.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorCollectorVersion -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -CollectorId 6 -MajorVersion 27 -MinorVersion 2 -StartDate 08/30/2018 -StartTime 12:00
+            PS C:\> Update-LogicMonitorCollectorVersion -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -CollectorId 6 -MajorVersion 27 -MinorVersion 2 -StartDate "08/30/2018 14:00"
 
-            In this example, the cmdlet will upgrade the collector to 27.002. The installation will run at 12:00 on 30 August 2018.
+            In this example, the cmdlet will upgrade the collector to 27.002. The installation will run at 14:00 on 30 August 2018.
+        .EXAMPLE
+            PS C:\> Update-LogicMonitorCollectorVersion -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -CollectorId 6 -MajorVersion 27 -MinorVersion 2 -StartDate "08/30/2018 2:00 PM"
+
+            In this example, the cmdlet will upgrade the collector to 27.002. The installation will run at 2:00 PM on 30 August 2018.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
@@ -54,15 +59,14 @@ Function Update-LogicMonitorCollectorVersion {
         [int]$Id,
 
         [Parameter(Mandatory = $True, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
-        [string]$DisplayName,
+        [string]$Description,
 
         [int]$MajorVersion,
 
+        [ValidateRange(0, 999)]
         [int]$MinorVersion,
 
         [datetime]$StartDate,
-
-        [datetime]$StartTime,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -76,7 +80,7 @@ Function Update-LogicMonitorCollectorVersion {
         [string]$data = ""
         [string]$httpVerb = "PATCH"
         [string]$queryParams = ""
-        [string]$resourcePath = "/setting/collectors"
+        [string]$resourcePath = "/setting/collector/collectors"
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
     }
@@ -96,40 +100,25 @@ Function Update-LogicMonitorCollectorVersion {
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         $message = ("{0}: Validating start time/date." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        If (($StartDate -eq $null) -and ($StartTime -eq $null)) {
-            # Neither start time nor end time provided.
-            $StartDate = (Get-Date).AddMinutes(1)
-        }
-        ElseIf (($StartDate -eq $null) -and ($StartTime -ne $null)) {
-            # Start date not provided. Start time is provided.
-            $StartDate = (Get-Date -Format d)
-            [datetime]$StartDate = $StartDate
-            $StartDate = $StartDate.Add($StartTime)
-        }
-        ElseIf (($StartDate -ne $null) -and ($StartTime -eq $null)) {
-            # Start date is provided. Start time is not provided.
-            $StartTime = (Get-Date -Format HH:mm)
-            [datetime]$StartDate = $StartDate
-            $StartDate = $StartDate.Add($StartTime)
-        }
-        Else {
-            $StartDate = $StartDate.Add($StartTime)
+        If ($StartDate -eq $null) {
+            # Neither start date is not provided.
+            $StartDate = (Get-Date)
         }
 
-        $startEpoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($StartDate).ToUniversalTime()).TotalMilliseconds)
+        $startEpoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($StartDate).ToUniversalTime()).TotalSeconds)
 
-        # Update $resourcePath to filter for a specific collector, when a collector ID or displayName is provided by the user.
+        # Update $resourcePath to filter for a specific collector, when a collector ID or Description is provided by the user.
         Switch ($PsCmdlet.ParameterSetName) {
             Default {
                 $resourcePath += "/$Id"
             }
-            NameFilter {
-                $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $DisplayName)
+            "Name" {
+                $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $Description)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                $collector = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DeviceDisplayName $DisplayName -EventLogSource $EventLogSource
+                $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDescriptionName $Description -EventLogSource $EventLogSource
 
                 $resourcePath += "/$($collector.id)"
 
@@ -138,17 +127,17 @@ Function Update-LogicMonitorCollectorVersion {
             }
         }
 
-        $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f (Get-Date -Format s), $resourcePath)
+        $message = ("{0}: Finished updating `$resourcePath. The value is:`r`n {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # Sleeping because we get an error about scheduling, if we don't wait.
         Start-Sleep -Seconds 5
 
-        $propertyData = @{
+        $upgradeProperties = @{
             "majorVersion" = $MajorVersion
             "minorVersion" = $MinorVersion
             "startEpoch"   = $startEpoch
-            "description"  = "Collector upgrade initiated by LogicMonitor PowerShell module."
+            "description"  = "Collector upgrade initiated by LogicMonitor PowerShell module ($env:USERNAME on $env:COMPUTERNAME)."
         }
 
         $propertyData.Add("onetimeUpgradeInfo", $upgradeProperties)
@@ -196,11 +185,11 @@ Function Update-LogicMonitorCollectorVersion {
             Return "Error", $response
         }
 
-        If ($response.status -ne "200") {
-            $message = ("{0}: LogicMonitor reported an error (status {1}). The message is: {2}" -f (Get-Date -Format s), $response.status, $response.errmsg)
+        If ($response.status -ne "1") {
+            $message = ("{0}: LogicMonitor reported an error (status {1})." -f (Get-Date -Format s), $response.status)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
         }
 
         Return $response
     }
-} #1.0.0.0
+} #1.0.0.1
