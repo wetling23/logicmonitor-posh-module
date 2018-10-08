@@ -1,11 +1,13 @@
 Function Get-LogicMonitorCollectorAvailableVersions {
     <#
         .DESCRIPTION
-            
+            Retrieves a list of available collector versions. Normally used with Update-LogicMonitorCollectorVersion.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 9 October 2018
                 - Initial release.
+            V1.0.0.1 date: 9 October 2018
+                - Updated documentation.
         .LINK
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
@@ -20,11 +22,11 @@ Function Get-LogicMonitorCollectorAvailableVersions {
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorVersion -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
+            PS C:\> Get-LogicMonitorCollectorAvailableVersions -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
 
-            
+            Retrieves a list of the collector versions available for download.
     #>
-    [CmdletBinding(DefaultParameterSetName = 'AllCollectors')]
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -107,4 +109,4 @@ Function Get-LogicMonitorCollectorAvailableVersions {
     }
 
     Return $response.items
-} #1.0.0.0
+} #1.0.0.1
