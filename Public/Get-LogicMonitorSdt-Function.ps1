@@ -11,6 +11,8 @@
             V1.0.0.1 date: 9 July 2018
                 - Changed references to "devices", to "SDT entries".
                 - Added parameter site assignment to the SdtEntry parameter, so it cannot be used with the SdtId parameter set.
+            V1.0.0.2 date: 24 October 2018
+                - Fixed bug in ParameterSetName.
         .LINK
 
         .PARAMETER AccessId
@@ -63,7 +65,10 @@
         [Parameter(Mandatory = $True, ParameterSetName = "AdminName")]
         [string]$AdminName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "AdminName", "Id", "AllSdt")]
+        [Parameter(ParameterSetName = "AdminName")]
+        [Parameter(ParameterSetName = "Id")]
+        [Parameter(ParameterSetName = "AllSdt")]
+        [Parameter(Mandatory = $True)]
         [ValidateSet('CollectorSDT', 'DeviceGroupSDT', 'DeviceSDT', 'ServiceCheckpointSDT', 'ServiceSDT')]
         [string]$SdtType,
 
@@ -276,4 +281,4 @@
 
         Return $sdts
     }
-} #1.0.0.1
+} #1.0.0.2
