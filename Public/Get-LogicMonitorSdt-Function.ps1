@@ -1,7 +1,7 @@
 ﻿Function Get-LogicMonitorSdt {
     <#
         .DESCRIPTION 
-            Retrieves a list of Standard Down Time (SDT) entries from LogicMonitor. The cmdlet allows for the retrieval of a specific SDT entry, all entries, or all entries initiated by a specific user. 
+            Retrieves a list of Standard Down Time (SDT) entries from LogicMonitor. The cmdlet allows for the retrieval of a specific SDT entry, all entries, or all entries initiated by a specific user. Uses /sdt/sdts.
 
             The list of SDT entries are further filterable by type of monitored object.
         .NOTES 
@@ -13,6 +13,8 @@
                 - Added parameter site assignment to the SdtEntry parameter, so it cannot be used with the SdtId parameter set.
             V1.0.0.2 date: 24 October 2018
                 - Fixed bug in ParameterSetName.
+            V1.0.0.3 date: 22 January 2019
+                - Removed SdtType from the list of mandatory parameters.Function Get-LogicMonitorSdt.
         .LINK
 
         .PARAMETER AccessId
@@ -68,7 +70,6 @@
         [Parameter(ParameterSetName = "AdminName")]
         [Parameter(ParameterSetName = "Id")]
         [Parameter(ParameterSetName = "AllSdt")]
-        [Parameter(Mandatory = $True)]
         [ValidateSet('CollectorSDT', 'DeviceGroupSDT', 'DeviceSDT', 'ServiceCheckpointSDT', 'ServiceSDT')]
         [string]$SdtType,
 
