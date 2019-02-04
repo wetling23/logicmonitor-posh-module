@@ -6,6 +6,8 @@ Function Get-LogicMonitorDeviceSdt {
             Author: Mike Hashemi
             V1.0.0.0 date: 1 February 2019
                 - Initial release.
+            V1.0.0.1 date: 4 February 2019
+                - Fixed bug where no output was returned.
         .LINK
 
         .PARAMETER AccessId
@@ -133,5 +135,7 @@ Function Get-LogicMonitorDeviceSdt {
 
             Return "Error"
         }
+
+        Return $response
     }
-} #1.0.0.0
+} #1.0.0.1
