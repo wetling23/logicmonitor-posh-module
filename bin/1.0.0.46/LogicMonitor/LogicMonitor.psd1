@@ -105,7 +105,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitorDeviceSdt to 1.0.0.0 (fixed output bug).'
+            ReleaseNotes = 'Updated Start-LogicMonitorDeviceSdt to 1.0.0.3 (Added support for time zones.).'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''
