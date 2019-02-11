@@ -2,7 +2,7 @@
     <#
         .DESCRIPTION 
             Starts standard down time (SDT) for a device in LogicMonitor.
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 9 July 2018
                 - Initial release.
@@ -11,6 +11,9 @@
             V1.0.0.2 date: 12 July 2018
                 - Changed the variable cast of $StartTime from [datetime] to [string].
                 - Changed references to "LogicMonitorCommentSdt", to "LogicMonitorDeviceSdt".
+            V1.0.0.3 date: 11 February 2019
+                - Added support for time zones.
+                - Updated message output.
         .LINK
 
         .PARAMETER AccessId
@@ -31,6 +34,8 @@
             Represents the duration of SDT in the format days, hours, minutes (xxx:xx:xx). If no value is provided, the duration will be one hour.
         .PARAMETER Comment
             Represents the text that will show in the notes field of the SDT entry. The text "...SDT initiated via Start-LogicMonitorDeviceSdt." will be appended to the user's comment.
+        .PARAMETER TimeZone
+            Represents the time zone name of the desired zone. Valid values can be found in the TZ database at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule". Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -75,6 +80,9 @@
 
         [string]$Comment,
 
+        [parameter(HelpMessage = "TZ database name: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")]
+        [string]$TimeZone,
+
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
         [switch]$BlockLogging
@@ -94,30 +102,30 @@
 
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
-                Write-Host $message -ForegroundColor Yellow;
+                Write-Host $message
 
                 $BlockLogging = $True
             }
         }
 
         $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         $message = ("{0}: Validating start time/date." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         If (-NOT($StartDate) -and -NOT($StartTime)) {
             # Neither start time nor end time provided.
 
             $message = ("{0}: StartDate and StartTime are null." -f (Get-Date -Format s))
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $StartDate = (Get-Date).AddMinutes(1)
         }
         ElseIf (-NOT($StartDate) -and ($StartTime)) {
             # Start date not provided. Start time is provided.
             $message = ("{0}: StartDate is null and StartTime is {1}." -f (Get-Date -Format s), $StartTime)
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $StartDate = Get-Date
             $StartDate = $StartDate.Date.Add((New-Timespan -Hour $StartTime.Split(':')[0] -Minute $StartTime.Split(':')[0]))
@@ -125,7 +133,7 @@
         ElseIf (($StartDate) -and -NOT($StartTime)) {
             # Start date is provided. Start time is not provided.
             $message = ("{0}: StartDate is {1} and StartTime is null. The object type of StartDate is {2}" -f (Get-Date -Format s), $StartDate, $StartDate.GetType())
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $currentTime = (Get-Date).AddMinutes(1)
             $StartDate = $StartDate.Date.Add((New-Timespan -Hour $currentTime.Hour -Minute $currentTime.Minute))
@@ -133,7 +141,7 @@
         Else {
             # Start date is provided. Start time is provided.
             $message = ("{0}: StartDate is {1} and StartTime is {2}." -f (Get-Date -Format s), $StartDate, $StartTime)
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $StartDate = $StartDate.Date.Add([Timespan]::Parse($StartTime))
         }
@@ -142,7 +150,7 @@
         [array]$duration = $duration.Split(":")
 
         $message = ("{0}: Configuring duration." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # Use the start date/time + duration to determine when the end date/time.
         $endDate = $StartDate.AddDays($duration[0])
@@ -150,23 +158,41 @@
         $endDate = $endDate.AddMinutes($duration[2])
 
         $message = ("{0}: The value of `$endDate is: {1}." -f (Get-Date -Format s), $endDate)
-        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         $sdtStart = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($StartDate).ToUniversalTime()).TotalMilliseconds)
         $sdtEnd = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($endDate).ToUniversalTime()).TotalMilliseconds)
 
         If ($PsCmdlet.ParameterSetName -eq "id") {
             $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Commnet: {4}." -f (Get-Date -Format s), $StartDate, $endDate, $Id, $Comment)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $data = "{`"sdtType`":1,`"type`":`"DeviceSDT`",`"deviceId`":`"$Id`",`"startDateTime`":$sdtStart,`"endDateTime`":$sdtEnd,`"comment`":`"$Comment`"}"
+            $data = @{
+                "type"          = "DeviceSDT"
+                "deviceId"      = $Id
+                "startDateTime" = $sdtStart
+                "endDateTime"   = $sdtEnd
+                "comment"       = $Comment
+            }
         }
         Else {
             $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device name: {3}; Commnet: {4}." -f (Get-Date -Format s), $StartDate, $endDate, $DisplayName, $Comment)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $data = "{`"sdtType`":1,`"type`":`"DeviceSDT`",`"deviceDisplayName`":`"$DisplayName`",`"startDateTime`":$sdtStart,`"endDateTime`":$sdtEnd,`"comment`":`"$Comment`"}"
+            $data = @{
+                "type"              = "DeviceSDT"
+                "deviceDisplayName" = $DisplayName
+                "startDateTime"     = $sdtStart
+                "endDateTime"       = $sdtEnd
+                "comment"           = $Comment
+            }
         }
+
+        If ($TimeZone) {
+            $data.Add("TimeZone", $TimeZone)
+        }
+
+        $data = ($data | ConvertTo-Json)
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -189,24 +215,22 @@
         $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
         $headers.Add("Authorization", $auth)
         $headers.Add("Content-Type", 'application/json')
+        $headers.Add("X-Version", '2')
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Try {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
-
-            If (($response.status -eq '200') -and ($response.errmsg -eq 'OK')) {
-                Return $response.status
-            }
         }
         Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}. The response was: {3}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception, $response.data)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_)
+            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
-            Return $response.status
+            Return $response
         }
+
+        Return $response
     }
-} #1.0.0.2
+} #1.0.0.3
