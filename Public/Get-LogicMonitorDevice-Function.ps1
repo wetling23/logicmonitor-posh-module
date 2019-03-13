@@ -293,3 +293,4 @@
     Return $devices
 } #1.0.0.11
 New-Alias -Name Get-LogicMonitorDevices -Value Get-LogicMonitorDevice
+Export-ModuleMember -Alias *
