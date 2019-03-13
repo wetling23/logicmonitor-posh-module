@@ -1,4 +1,4 @@
-﻿Function Get-LogicMonitorDevices {
+﻿Function Get-LogicMonitorDevice {
     <#
         .DESCRIPTION 
             Returns a list of LogicMonitor-monitored devices and all of their properties. By default, the function returns all devices. 
@@ -29,9 +29,12 @@
             V1.0.0.9 date: 23 April 2018
                 - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
                 - Replaced ! with -NOT.
-            V10.0.0.10 date: 16 June 2018
+            V1.0.0.10 date: 16 June 2018
                 - Updated tabs.
                 - Removed $props hash table, since it is not used.
+            V1.0.0.11 date: 13 March 2019
+                - Updated default batch count.
+                - Renamed cmdlet and added command alias.
         .LINK
             
         .PARAMETER AccessId
@@ -73,34 +76,42 @@
 
             In this example, the function will search for the monitored device with "server1.domain.local" (the FQDN) in the name property and will return its properties.
     #>
-    [CmdletBinding(DefaultParameterSetName = ’AllDevices’)]
+    [CmdletBinding(DefaultParameterSetName = 'AllDevices')]
     Param (
         [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = ’AllDevices’)]
-        [Parameter(ParameterSetName = ’IDFilter’)]
-        [Parameter(ParameterSetName = ’NameFilter’)]
-        [Parameter(ParameterSetName = ’IPFilter’)]
+        [Parameter(ParameterSetName = 'AllDevices')]
+        [Parameter(ParameterSetName = 'IDFilter')]
+        [Parameter(ParameterSetName = 'NameFilter')]
+        [Parameter(ParameterSetName = 'IPFilter')]
         $AccessId,
+
         [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = ’AllDevices’)]
-        [Parameter(ParameterSetName = ’IDFilter’)]
-        [Parameter(ParameterSetName = ’NameFilter’)]
-        [Parameter(ParameterSetName = ’IPFilter’)]
+        [Parameter(ParameterSetName = 'AllDevices')]
+        [Parameter(ParameterSetName = 'IDFilter')]
+        [Parameter(ParameterSetName = 'NameFilter')]
+        [Parameter(ParameterSetName = 'IPFilter')]
         $AccessKey,
+
         [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = ’AllDevices’)]
-        [Parameter(ParameterSetName = ’IDFilter’)]
-        [Parameter(ParameterSetName = ’NameFilter’)]
-        [Parameter(ParameterSetName = ’IPFilter’)]
+        [Parameter(ParameterSetName = 'AllDevices')]
+        [Parameter(ParameterSetName = 'IDFilter')]
+        [Parameter(ParameterSetName = 'NameFilter')]
+        [Parameter(ParameterSetName = 'IPFilter')]
         $AccountName,
-        [Parameter(Mandatory = $True, ParameterSetName = ’IDFilter’)]
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
         [int]$DeviceId,
-        [Parameter(Mandatory = $True, ParameterSetName = ’NameFilter’)]
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
         [string]$DeviceDisplayName,
-        [Parameter(Mandatory = $True, ParameterSetName = ’IPFilter’)]
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
         [string]$DeviceName,
-        [int]$BatchSize = 300,
+
+        [int]$BatchSize = 950,
+
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
+
         [switch]$BlockLogging
     )
 
@@ -138,7 +149,7 @@
     # Update $resourcePath to filter for a specific device, when a device ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
         $resourcePath += "/$DeviceId"
-			
+
         $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
     }
@@ -175,7 +186,7 @@
 
             # Get current time in milliseconds
             $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-        
+
             # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
 
@@ -221,7 +232,7 @@
                 # The first time through the loop, figure out how many times we need to loop (to get all devices).
                 If ($firstLoopDone -eq $false) {
                     [int]$deviceBatchCount = ((($response.data.total) / $BatchSize) + 1)
-					
+
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices. LogicMonitor reports that there are {2} devices." `
                             -f (Get-Date -Format s), $deviceBatchCount, $response.data.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -253,14 +264,14 @@
                 Else {
                     $devices = $response.data.items
                 }
-				
+
                 $message = ("{0}: There are {1} devices in `$devices." -f (Get-Date -Format s), $($devices.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all devices).
                 If ($firstLoopDone -eq $false) {
                     [int]$deviceBatchCount = ((($response.data.total) / 250) + 1)
-					
+
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices." -f (Get-Date -Format s), $deviceBatchCount)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
@@ -280,4 +291,5 @@
     }
 
     Return $devices
-} #1.0.0.10
+} #1.0.0.11
+New-Alias -Name Get-LogicMonitorDevices -Value Get-LogicMonitorDevice
