@@ -8,6 +8,8 @@ Function Get-LogicMonitorDeviceSdt {
                 - Initial release.
             V1.0.0.1 date: 4 February 2019
                 - Fixed bug where no output was returned.
+            V1.0.0.2 date: 13 March 2019
+                - Added error message to command output.
         .LINK
 
         .PARAMETER AccessId
@@ -57,7 +59,6 @@ Function Get-LogicMonitorDeviceSdt {
 
     Begin {
         # Initialize variables.
-        $filter = $null # The script
         $httpVerb = "GET" # Define what HTTP operation will the script run.
         $resourcePath = "/device/devices" # Define the resourcePath, based on what you're searching for.
         $queryParams = $null
@@ -130,7 +131,7 @@ Function Get-LogicMonitorDeviceSdt {
             $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
         }
         Catch {
-            $message = ("{0}: Unexpected error getting device SDTs. To prevent errors, {1} will exit." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+            $message = ("{0}: Unexpected error getting device SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
             Return "Error"
@@ -138,4 +139,4 @@ Function Get-LogicMonitorDeviceSdt {
 
         Return $response
     }
-} #1.0.0.1
+} #1.0.0.2
