@@ -1,9 +1,9 @@
-﻿Function Get-LogicMonitorDataSources {
+﻿Function Get-LogicMonitorDataSource {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Returns a list of LogicMonitor DataSources. By default, the function returns all datasources. If a DataSource ID or name is provided, the function will 
             return properties for the specified DataSource.
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 5 March 2017
                 - Initial release.
@@ -27,6 +27,8 @@
             V1.0.0.9 date: 21 June 2018
                 - Added encoding of &, to UTF-8.
                 - Added example.
+            V1.0.0.10 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
             https://git.synoptek.com/tools-group/logicmonitor/Synoptek.LogicMonitor.PowershellModule
         .PARAMETER AccessId
@@ -39,42 +41,42 @@
             Represents the ID of the desired DataSource.
         .PARAMETER XmlOutput
             When included, the function will request XML output from LogicMonitor. The switch is only available when a DataSource ID is specified.
-        .PARAMETER DataSourceDisplayName
+        .PARAMETER DisplayName
             Represents the display name of the desired DataSource.
-        .PARAMETER DataSourceApplyTo
+        .PARAMETER ApplyTo
             Represents the "AppliesTo" filter of the desired DataSource.
         .PARAMETER BatchSize
-            Default value is 950. Represents the number of DataSoruces to request from LogicMonitor, in a single batch.
+            Default value is 1000. Represents the number of DataSoruces to request from LogicMonitor, in a single batch.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
 
             In this example, the function will search for all monitored devices and will return their properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceId 6
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceId 6
 
             In this example, the function returns the DataSource with ID '6'.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceId 6 -XmlOutput
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceId 6 -XmlOutput
 
             In this example, the function returns the DataSource with ID '6', in XML format.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceDisplayName 'Oracle Library Cache'
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName 'Oracle Library Cache'
 
             In this example, the function returns the DataSource with display name 'Oracle Library Cache'.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceApplyTo 'system.hostname =~ "255.1.1.1"'
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -ApplyTo 'system.hostname =~ "255.1.1.1"'
 
             In this example, the function returns the DataSource with the 'appliesTo' filter 'system.hostname =~ "255.1.1.1"'.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDataSources -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DataSourceApplyTo 'isWindows()&&hasCategory("collector")'
+            PS C:\> Get-LogicMonitorDataSource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -ApplyTo 'isWindows()&&hasCategory("collector")'
 
             In this example, the function returns the DataSource with the 'appliesTo' filter 'isWindows()&&hasCategory("collector")'.
     #>
-    [CmdletBinding(DefaultParameterSetName = ’AllDataSources’)]
+    [CmdletBinding(DefaultParameterSetName = 'AllDataSources')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -85,19 +87,22 @@
         [Parameter(Mandatory = $True)]
         $AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’IDFilter’)]
-        [int]$DataSourceId,
+        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Alias("DataSourceId")]
+        [int]$Id,
 
-        [Parameter(ParameterSetName = ’IDFilter’)]
+        [Parameter(ParameterSetName = 'IDFilter')]
         [switch]$XmlOutput,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'DisplayNameFilter')]
-        [string]$DataSourceDisplayName,
+        [Alias("DataSourceDisplayName")]
+        [string]$DisplayName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'AppliesToFilter')]
-        [string]$DataSourceApplyTo,
+        [Alias("DataSourceApplyTo")]
+        [string]$ApplyTo,
 
-        [int]$BatchSize = 950,
+        [int]$BatchSize = 1000,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -130,6 +135,7 @@
     [string]$resourcePath = "/setting/datasources" # Define the resourcePath.
     $queryParams = $null
     $dataSources = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
@@ -138,7 +144,7 @@
 
     # Update $resourcePath to filter for a specific DataSource, when a DataSource ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-        $resourcePath += "/$DataSourceId"
+        $resourcePath += "/$Id"
 
         $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -165,17 +171,39 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "DisplayNameFilter" {
-                $queryParams = "?filter=displayName:$DataSourceDisplayName&offset=$offset&size=$BatchSize&sort=id"
+                # Replace special characters to better encode the URL.
+                $DisplayName = $DisplayName.Replace('_', '%5F')
+                $DisplayName = $DisplayName.Replace(' ', '%20')
+
+                $queryParams = "?filter=displayName:`"$DisplayName`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "AppliesToFilter" {
-                # Need to encode the ampersands in UTF-8, so the API will interpret them correctly.
-                If ($DataSourceApplyTo -match '&') {
-                    $DataSourceApplyTo = $DataSourceApplyTo.Replace("&", "%26")
-                }
-                $queryParams = "?filter=appliesTo:$DataSourceApplyTo&offset=$offset&size=$BatchSize&sort=id"
+                # Replace special characters to better encode the URL.
+                $ApplyTo = $ApplyTo.Replace('"', '%2522')
+                $ApplyTo = $ApplyTo.Replace('&', '%26')
+                $ApplyTo = $ApplyTo.Replace("`r`n", "`n")
+                $ApplyTo = $ApplyTo.Replace('#', '%23')
+                $ApplyTo = $ApplyTo.Replace("`n", '%0A')
+                $ApplyTo = $ApplyTo.Replace(')', '%29')
+                $ApplyTo = $ApplyTo.Replace('(', '%28')
+                $ApplyTo = $ApplyTo.Replace('>', '%3E')
+                $ApplyTo = $ApplyTo.Replace('<', '%3C')
+                $ApplyTo = $ApplyTo.Replace('/', '%2F')
+                $ApplyTo = $ApplyTo.Replace(',', '%2C')
+                $ApplyTo = $ApplyTo.Replace('*', '%2A')
+                $ApplyTo = $ApplyTo.Replace('!', '%21')
+                $ApplyTo = $ApplyTo.Replace('=', '%3D')
+                $ApplyTo = $ApplyTo.Replace('~', '%7E')
+                $ApplyTo = $ApplyTo.Replace(' ', '%20')
+                $ApplyTo = $ApplyTo.Replace('|', '%7C')
+                $ApplyTo = $ApplyTo.Replace('$', '%24')
+                $ApplyTo = $ApplyTo.Replace('\', '%5C')
+                $ApplyTo = $ApplyTo.Replace('_', '%5F')
+
+                $queryParams = "?filter=appliesTo:`"$ApplyTo`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -184,6 +212,9 @@
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+
+        $message = ("{0}: The value of `$url is: {1}." -f (Get-Date -Format s), $url)
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         If ($firstLoopDone -eq $false) {
             $message = ("{0}: Building request header." -f (Get-Date -Format s))
@@ -206,22 +237,35 @@
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
             $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
             $headers.Add("Content-Type", 'application/json')
+            $headers.Add("X-Version", 2)
         }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error getting DataSources. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error"
+                }
+            }
         }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, {1} function will exit. The specific error message is: {2}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-        
-            Return
-        }
+        While ($stopLoop -eq $false)
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllDataSources" {
@@ -229,17 +273,17 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no DataSource ID is provided...
-                $dataSources += $response.data.items
+                $dataSources += $response.items
 
                 $message = ("{0}: There are {1} DataSources in `$dataSources." -f (Get-Date -Format s), $($dataSources.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all DataSources).
                 If ($firstLoopDone -eq $false) {
-                    [int]$dataSourceBatchCount = ((($response.data.total) / $BatchSize) + 1)
+                    [int]$dataSourceBatchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all DataSources. LogicMonitor reports that there are {2} DataSources." `
-                            -f (Get-Date -Format s), $dataSourceBatchCount, $response.data.total)
+                            -f (Get-Date -Format s), $dataSourceBatchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
@@ -255,23 +299,18 @@
                 # Increment the variable, so we know when we have retrieved all DataSources.
                 $currentBatchNum++
             }
-            {$_ -in ("IDFilter", "DisplayNameFilter", "AppliesToFilter")} {
+            "IDFilter" {
                 $message = ("{0}: Entering switch statement for single-DataSource retrieval." -f (Get-Date -Format s))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                If ($XmlOutput) {
-                    $dataSources = $response
-                }
-                Else {
-                    $dataSources = $response.data ###Should this be $response.data.items? What about just for displaynamefilter and appliestofilter
-                }
+                $dataSources = $response
 
                 $message = ("{0}: There are {1} DataSources in `$dataSources." -f (Get-Date -Format s), $($dataSources.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all DataSources).
                 If ($firstLoopDone -eq $false) {
-                    [int]$dataSourceBatchCount = ((($response.data.total) / 250) + 1)
+                    [int]$dataSourceBatchCount = ((($response.total) / 250) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all DataSources." -f (Get-Date -Format s), $dataSourceBatchCount)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -288,8 +327,48 @@
                 # Increment the variable, so we know when we have retrieved all DataSources.
                 $currentBatchNum++
             }
+            {$_ -in ("DisplayNameFilter", "AppliesToFilter")} {
+                $message = ("{0}: Entering switch statement for filtered-DataSource retrieval." -f (Get-Date -Format s))
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                If ($response.items.count -eq 1) {
+                    $message = ("{0}: Found a single DataSource." -f (Get-Date -Format s))
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    $dataSources = $response.items
+
+                    Return $dataSources
+                }
+                Else {
+                    $dataSources += $response.items
+
+                    $message = ("{0}: There are {1} DataSources in `$dataSources." -f (Get-Date -Format s), $($dataSources.count))
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    # The first time through the loop, figure out how many times we need to loop (to get all DataSources).
+                    If ($firstLoopDone -eq $false) {
+                        [int]$dataSourceBatchCount = ((($response.total) / 250) + 1)
+
+                        $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all DataSources." -f (Get-Date -Format s), $dataSourceBatchCount)
+                        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                        $firstLoopDone = $True
+
+                        $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                    }
+
+                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $dataSourceBatchCount)
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    # Increment the variable, so we know when we have retrieved all DataSources.
+                    $currentBatchNum++
+                }
+            }
         }
     }
 
     Return $dataSources
-} #1.0.0.9
+} #1.0.0.10
+New-Alias -Name Get-LogicMonitorDataSource -Value Get-LogicMonitorDataSources -Force
+Export-ModuleMember -Alias *

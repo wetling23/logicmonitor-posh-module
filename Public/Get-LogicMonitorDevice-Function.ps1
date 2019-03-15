@@ -1,10 +1,10 @@
 ﻿Function Get-LogicMonitorDevice {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Returns a list of LogicMonitor-monitored devices and all of their properties. By default, the function returns all devices. 
             If a device ID, device name (IP or DNS name), or device display name is provided, the function will return properties for 
             the specified device.
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1 date: 21 November 2016
             V1.0.0.1 date: 13 January 2017
@@ -35,6 +35,8 @@
             V1.0.0.11 date: 13 March 2019
                 - Updated default batch count.
                 - Renamed cmdlet and added command alias.
+            V1.0.0.12 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
             
         .PARAMETER AccessId
@@ -43,14 +45,14 @@
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER DeviceId
+        .PARAMETER Id
             Represents deviceId of the desired device.
-        .PARAMETER DeviceDisplayName
+        .PARAMETER DisplayName
             Represents display name of the desired device.
-        .PARAMETER DeviceName
+        .PARAMETER Name
             Represents IP address or FQDN of the desired device.
         .PARAMETER BatchSize
-            Default value is 300. Represents the number of devices to request from LogicMonitor, in a single batch.
+            Default value is 1000. Represents the number of devices to request from LogicMonitor, in a single batch.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -60,19 +62,19 @@
 
             In this example, the function will search for all monitored devices and will return their properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceId 6
+            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6
 
             In this example, the function will search for the monitored device with "6" in the ID property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceDisplayName server1
+            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1
 
             In this example, the function will search for the monitored device with "server1" in the displayName property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceName 10.1.1.1
+            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name 10.1.1.1
 
             In this example, the function will search for the monitored device with "10.1.1.1" in the name property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceName server1.domain.local
+            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local
 
             In this example, the function will search for the monitored device with "server1.domain.local" (the FQDN) in the name property and will return its properties.
     #>
@@ -100,15 +102,18 @@
         $AccountName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
-        [int]$DeviceId,
+        [Alias("DeviceId")]
+        [int]$Id,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
-        [string]$DeviceDisplayName,
+        [Alias("DeviceDisplayName")]
+        [string]$DisplayName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
-        [string]$DeviceName,
+        [Alias("DeviceName")]
+        [string]$Name,
 
-        [int]$BatchSize = 950,
+        [int]$BatchSize = 1000,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -127,7 +132,7 @@
     }
 
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
     $message = ("{0}: Operating in the {1} parameter set." -f (Get-Date -Format s), $PsCmdlet.ParameterSetName)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -140,6 +145,7 @@
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/device/devices" # Define the resourcePath, based on the type of device you're searching for.
     $queryParams = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
@@ -148,7 +154,7 @@
 
     # Update $resourcePath to filter for a specific device, when a device ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-        $resourcePath += "/$DeviceId"
+        $resourcePath += "/$Id"
 
         $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -164,13 +170,13 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "NameFilter" {	
-                $queryParams = "?filter=displayName:$DeviceDisplayName&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=displayName:`"$DisplayName`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "IPFilter" {
-                $queryParams = "?filter=name:$DeviceName&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -201,22 +207,35 @@
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
             $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
             $headers.Add("Content-Type", 'application/json')
+            $headers.Add("X-Version", 2)
         }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error"
+                }
+            }
         }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the Get-LogicMonitorDevices function will exit. The specific error message is: {1}" `
-                    -f (Get-Date -Format s), $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-        
-            Return
-        }
+        While ($stopLoop -eq $false)
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllDevices" {
@@ -224,17 +243,17 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no device ID, IP/FQDN, or display name is provided...
-                $devices += $response.data.items
+                $devices += $response.items
 
                 $message = ("{0}: There are {1} devices in `$devices." -f (Get-Date -Format s), $($devices.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all devices).
                 If ($firstLoopDone -eq $false) {
-                    [int]$deviceBatchCount = ((($response.data.total) / $BatchSize) + 1)
+                    [int]$deviceBatchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices. LogicMonitor reports that there are {2} devices." `
-                            -f (Get-Date -Format s), $deviceBatchCount, $response.data.total)
+                            -f (Get-Date -Format s), $deviceBatchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
@@ -259,10 +278,10 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-                    $devices = $response.data
+                    $devices = $response
                 }
                 Else {
-                    $devices = $response.data.items
+                    $devices = $response.items
                 }
 
                 $message = ("{0}: There are {1} devices in `$devices." -f (Get-Date -Format s), $($devices.count))
@@ -270,7 +289,7 @@
 
                 # The first time through the loop, figure out how many times we need to loop (to get all devices).
                 If ($firstLoopDone -eq $false) {
-                    [int]$deviceBatchCount = ((($response.data.total) / 250) + 1)
+                    [int]$deviceBatchCount = ((($response.total) / 250) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices." -f (Get-Date -Format s), $deviceBatchCount)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -291,6 +310,6 @@
     }
 
     Return $devices
-} #1.0.0.11
-New-Alias -Name Get-LogicMonitorDevices -Value Get-LogicMonitorDevice
+} #1.0.0.12
+New-Alias -Name Get-LogicMonitorDevice -Value Get-LogicMonitorDevices -Force
 Export-ModuleMember -Alias *

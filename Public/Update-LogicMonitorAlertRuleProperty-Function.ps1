@@ -1,4 +1,4 @@
-Function Update-LogicMonitorAlertRulesProperties {
+Function Update-LogicMonitorAlertRuleProperty {
     <#
         .DESCRIPTION
             Accepts an alert rule ID or name and one or more property name/value pairs, then updates the property(ies).
@@ -17,9 +17,9 @@ Function Update-LogicMonitorAlertRulesProperties {
             Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER AlertRuleId
+        .PARAMETER Id
             Represents the collector's ID. Accepts pipeline input by property name.
-        .PARAMETER AlertRuleName
+        .PARAMETER Name
             Represents the collectors description.
         .PARAMETER PropertyName
             Represents the name of the target property. Note that LogicMonitor properties are case sensitive.
@@ -30,7 +30,7 @@ Function Update-LogicMonitorAlertRulesProperties {
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorAlertRulesProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyNames hostname,collectorSize -PropertyValues server2,small
+            PS C:\> Update-LogicMonitorAlertRuleProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyNames hostname,collectorSize -PropertyValues server2,small
 
             In this example, the cmdlet will update the hostname and collectorSize properties for the collector with "6" in the ID property. The hostname will be set to "server2" and the collector size will be set to "Small". If the properties are not present, they will be added.
     #>
@@ -46,10 +46,12 @@ Function Update-LogicMonitorAlertRulesProperties {
         [string]$AccountName,
 
         [Parameter(Mandatory = $True, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'Default')]
-        [int]$AlertRuleId,
+        [Alias("AlertRuleId")]
+        [int]$Id,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
-        [string]$AlertRuleName,
+        [Alias("AlertRuleName")]
+        [string]$Name,
 
         [Parameter(Mandatory = $True)]
         [ValidateSet('name', 'priority', 'levelStr', 'devices', 'deviceGroups', 'datasource', 'instance', 'datapoint', 'escalationInterval', 'escalatingChainId', 'suppressAlertClear', 'suppressAlertAckSdt')]
@@ -99,13 +101,13 @@ Function Update-LogicMonitorAlertRulesProperties {
             # Update $resourcePath to filter for a specific alert rule, when an alert rule ID, or name are provided by the user.
             Switch ($PsCmdlet.ParameterSetName) {
                 Default {
-                    $resourcePath += "/$AlertRuleId"
+                    $resourcePath += "/$Id"
                 }
                 "NameFilter" {
-                    $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $AlertRuleName)
+                    $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $Name)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                    $alertRule = Get-LogicMonitorAlertRules -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -AlertRuleName $AlertRuleName -EventLogSource $EventLogSource
+                    $alertRule = Get-LogicMonitorAlertRules -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
 
                     $resourcePath += "/$($alertRule.id)"
 
@@ -183,3 +185,5 @@ Function Update-LogicMonitorAlertRulesProperties {
         }
     }
 } #1.0.0.0
+New-Alias -Name Get-LogicMonitorAlertRuleProperty -Value Get-LogicMonitorAlertRulesProperties -Force
+Export-ModuleMember -Alias *

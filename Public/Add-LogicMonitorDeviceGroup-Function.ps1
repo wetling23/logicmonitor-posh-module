@@ -1,8 +1,8 @@
 ﻿Function Add-LogicMonitorDeviceGroup {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
 
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1 date: 2 February 2017
                 - Initial release.
@@ -101,7 +101,7 @@
     }
 
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
     [int]$index = 0
@@ -111,7 +111,7 @@
     $resourcePath = "/device/groups"
     $requiredProperties = "`"name`":`"$GroupName`",`"parentId`":`"$ParentGroupID`""
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols    
+    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     If ($Description) {
         $message = ("{0}: Appending `"description`" to the list of properties." -f (Get-Date -Format s))

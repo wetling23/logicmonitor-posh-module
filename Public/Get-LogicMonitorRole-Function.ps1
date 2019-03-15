@@ -1,4 +1,4 @@
-﻿Function Get-LogicMonitorRoles {
+﻿Function Get-LogicMonitorRole {
     <#
         .DESCRIPTION
             Retrieves role objects from LogicMonitor.
@@ -6,6 +6,8 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 8 August 2018
                 - Initial release.
+            V1.0.0.1 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
@@ -20,7 +22,7 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorRoles -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
+            PS C:\> Get-LogicMonitorRole -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
 
             In this example, the function gets all roles, in batches of 1000. Output is logged to the application log, and written to the host.
     #>
@@ -53,8 +55,8 @@
         }
     }
 
-    $message = Write-Output ("{0}: Beginning {1}" -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
     $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
@@ -64,6 +66,7 @@
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/setting/roles" # Define the resourcePath, based on the type of query you are doing.
     $queryParams = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
@@ -96,34 +99,47 @@
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
             $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
             $headers.Add("Content-Type", 'application/json')
+            $headers.Add("X-Version", 2)
         }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
-        }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the function will exit. The specific error message is: {1}" `
-                    -f (Get-Date -Format s), $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
 
-            Return
-        }
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
 
-        $roles += $response.data.items
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error getting roles. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error"
+                }
+            }
+        }
+        While ($stopLoop -eq $false)
+
+        $roles += $response.items
 
         $message = ("{0}: There are {1} roles in `$roles." -f (Get-Date -Format s), $($roles.count))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # The first time through the loop, figure out how many times we need to loop (to get all roles).
         If ($firstLoopDone -eq $false) {
-            [int]$batchCount = ((($response.data.total) / $BatchSize) + 1)
+            [int]$batchCount = ((($response.total) / $BatchSize) + 1)
 
             $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all roles. LogicMonitor reports that there are {2} roles." `
-                    -f (Get-Date -Format s), $batchCount, $response.data.total)
+                    -f (Get-Date -Format s), $batchCount, $response.total)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
@@ -144,4 +160,6 @@
     }
 
     Return $roles
-} #1.0.0.0
+} #1.0.0.1
+New-Alias -Name Get-LogicMonitorRole -Value Get-LogicMonitorRoles -Force
+Export-ModuleMember -Alias *

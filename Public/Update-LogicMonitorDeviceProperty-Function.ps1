@@ -1,4 +1,4 @@
-﻿Function Update-LogicMonitorDeviceProperties {
+﻿Function Update-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
             Accepts a device ID, display name, or device IP/DNS name, and one or more property name/value pairs, then updates the property(ies).
@@ -45,9 +45,9 @@
             Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER DeviceId
+        .PARAMETER Id
             Represents the device ID of a monitored device.
-        .PARAMETER DeviceDisplayName
+        .PARAMETER DisplayName
             Represents the device's display name.
         .PARAMETER PropertyName
             Represents the name of the target property. Note that LogicMonitor properties are case sensitive.
@@ -58,23 +58,23 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceId 6 -PropertyNames Location,AssignedTeam -PropertyValues Denver,Finance
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyNames Location,AssignedTeam -PropertyValues Denver,Finance
 
             In this example, the function will update the Location and AssignedTeam properties for the device with "6" in the ID property. The location will be set to "Denver" and the assigned team will be "Finance". If the properties are not present, they will be added.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceDisplayName server1 -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1 -PropertyNames Location -PropertyValues Denver
 
             In this example, the function will update the Location property for the device with "server1" in the displayName property. The location will be set to "Denver". If the property is not present, it will be added.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceName 10.0.0.0 -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name 10.0.0.0 -PropertyNames Location -PropertyValues Denver
 
             In this example, the function will update the Location property for the device with "10.0.0.0" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceName server1.domain.local -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local -PropertyNames Location -PropertyValues Denver
 
             In this example, the function will update the Location property for the device with "server1.domain.local" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
     #>
-    [CmdletBinding(DefaultParameterSetName = ’Default’)]
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -85,14 +85,17 @@
         [Parameter(Mandatory = $True)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’Default’)]
-        [int]$DeviceId,
+        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Alias("DeviceId")]
+        [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’NameFilter’)]
-        [string]$DeviceDisplayName,
+        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Alias("DeviceDisplayName")]
+        [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’IPFilter’)]
-        [string]$DeviceName,
+        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Alias("DeviceName")]
+        [string]$Name,
 
         [Parameter(Mandatory = $True)]
         [string[]]$PropertyNames,
@@ -133,28 +136,28 @@
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
-            $resourcePath += "/$DeviceId"
+            $resourcePath += "/$Id"
         }
-        NameFilter {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DeviceDisplayName)
+        "NameFilter" {
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DisplayName)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DeviceDisplayName $DeviceDisplayName -EventLogSource $EventLogSource
+            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
 
             $resourcePath += "/$($device.id)"
 
             $message = ("{0}: The value of `$resourcePath is {1}." -f (Get-Date -Format s), $resourcePath)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
         }
-        IPFilter {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DeviceName)
+        "IPFilter" {
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $Name)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DeviceName $DeviceName -EventLogSource $EventLogSource
+            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
-                        -f (Get-Date -Format s), $DeviceName, $device.count, $MyInvocation.MyCommand)
+                        -f (Get-Date -Format s), $Name, $device.count, $MyInvocation.MyCommand)
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
@@ -281,4 +284,6 @@
     }
 
     Return $response
-} #1.0.0.13
+} #1.0.0.14
+New-Alias -Name Get-LogicMonitorDeviceProperty -Value Get-LogicMonitorDeviceProperties -Force
+Export-ModuleMember -Alias *

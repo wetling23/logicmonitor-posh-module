@@ -8,6 +8,8 @@ Function Remove-LogicMonitorCollectorVersion {
                 - Initial release.
             V1.0.0.1 date: 10 September 2018
                 - Updated comments.
+            V1.0.0.2 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -67,6 +69,7 @@ Function Remove-LogicMonitorCollectorVersion {
         [string]$httpVerb = "PATCH"
         [string]$queryParams = ""
         [string]$resourcePath = "/setting/collector/collectors"
+        [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
     }
@@ -158,17 +161,29 @@ Function Remove-LogicMonitorCollectorVersion {
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
-        }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
 
-            Return "Error", $response
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error scheduling a downgrade. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error", $response
+                }
+            }
         }
+        While ($stopLoop -eq $false)
 
         Return $response
     }
-} #1.0.0.1
+} #1.0.0.2

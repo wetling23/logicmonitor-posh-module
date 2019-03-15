@@ -1,4 +1,4 @@
-﻿Function Get-LogicMonitorAlertRules {
+﻿Function Get-LogicMonitorAlertRule {
     <#
         .DESCRIPTION
             Retrieves Alert objects from LogicMonitor.
@@ -10,16 +10,19 @@
                 - Added support for retrieval of single alert rule, either by ID or name.
                 - Fixed example typo.
                 - Added example.
+            V1.0.0.2 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
+
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER AlertRuleId
+        .PARAMETER Id
             Represents deviceId of the desired device.
-        .PARAMETER AlertRuleName
+        .PARAMETER Name
             Represents IP address or FQDN of the desired device.
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of alert rules to request from LogicMonitor.
@@ -28,11 +31,11 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlertRules -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
+            PS C:\> Get-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name>
 
             In this example, the function gets all alert rules, in batches of 1000. Output is logged to the application log, and written to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlertRules -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -AlertRuleId 1 -BlockLogging
+            PS C:\> Get-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Id 1 -BlockLogging
 
             In this example, the function gets the properties of the alert rule with ID "1". No output is logged to the event log.
     #>
@@ -48,10 +51,12 @@
         $AccountName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
-        [int]$AlertRuleId,
+        [Alias("AlertRuleId")]
+        [int]$Id,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
-        [string]$AlertRuleName,
+        [Alias("AlertRuleName")]
+        [string]$Name,
 
         [int]$BatchSize = 1000,
 
@@ -71,8 +76,8 @@
         }
     }
 
-    $message = Write-Output ("{0}: Beginning {1}" -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    $message = Write-Output ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
     $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
@@ -82,12 +87,13 @@
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/setting/alert/rules" # Define the resourcePath, based on the type of query you are doing.
     $queryParams = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     # Update $resourcePath to filter for a specific alert rule, when a alert rule ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-        $resourcePath += "/$AlertRuleId"
+        $resourcePath += "/$Id"
 
         $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -103,7 +109,7 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "NameFilter" {
-                $queryParams = "?filter=name:$AlertRuleName&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -134,22 +140,35 @@
             $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
             $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
             $headers.Add("Content-Type", 'application/json')
+            $headers.Add("X-Version", 2)
         }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
-        }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the function will exit. The specific error message is: {1}" `
-                    -f (Get-Date -Format s), $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
 
-            Return
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error getting alert rules. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error"
+                }
+            }
         }
+        While ($stopLoop -eq $false)
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllAlertRules" {
@@ -157,17 +176,17 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no device ID, IP/FQDN, or display name is provided...
-                $alertRules += $response.data.items
+                $alertRules += $response.items
 
                 $message = ("{0}: There are {1} alert rules in `$alertRules." -f (Get-Date -Format s), $($alertRules.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all alert rules).
                 If ($firstLoopDone -eq $false) {
-                    [int]$batchCount = ((($response.data.total) / $BatchSize) + 1)
+                    [int]$batchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all alert rules. LogicMonitor reports that there are {2} alert rules." `
-                            -f (Get-Date -Format s), $batchCount, $response.data.total)
+                            -f (Get-Date -Format s), $batchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
@@ -192,10 +211,10 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-                    $alertRules += $response.data
+                    $alertRules += $response
                 }
                 Else {
-                    $alertRules += $response.data.items
+                    $alertRules += $response.items
                 }
 
                 $message = ("{0}: There are {1} alert rules in `$alertRules." -f (Get-Date -Format s), $($alertRules.count))
@@ -203,10 +222,10 @@
 
                 # The first time through the loop, figure out how many times we need to loop (to get all alert rules).
                 If ($firstLoopDone -eq $false) {
-                    [int]$batchCount = ((($response.data.total) / $BatchSize) + 1)
+                    [int]$batchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all alert rules. LogicMonitor reports that there are {2} alert rules." `
-                            -f (Get-Date -Format s), $batchCount, $response.data.total)
+                            -f (Get-Date -Format s), $batchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
@@ -223,4 +242,6 @@
     }
 
     Return $alertRules
-} #1.0.0.1
+} #1.0.0.2
+New-Alias -Name Get-LogicMonitorAlertRule -Value Get-LogicMonitorAlertRules -Force
+Export-ModuleMember -Alias *

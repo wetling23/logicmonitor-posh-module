@@ -7,6 +7,10 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 15 February 2019
                 - Initial release.
+            V1.0.0.1 date: 8 March 2019
+                - Fixed bugs with filters.
+            V1.0.0.2 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
             
         .PARAMETER AccessId
@@ -17,10 +21,10 @@
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Id
             Represents the ID of the desired PropertySource.
-        .PARAMETER XmlOutput
-            When included, the function will request XML output from LogicMonitor. The switch is only available when a PropertySource ID is specified.
+        .PARAMETER Name
+            Represents the name of the desired PropertySource.
         .PARAMETER BatchSize
-            Default value is 950. Represents the number of DataSoruces to request from LogicMonitor, in a single batch.
+            Default value is 1000. Represents the number of DataSoruces to request from LogicMonitor, in a single batch.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -34,11 +38,7 @@
 
             In this example, the function returns the PropertySource with ID '6'.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorPropertySource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -XmlOutput
-
-            In this example, the function returns the PropertySource with ID '6', in XML format.
-        .EXAMPLE
-            PS C:\> Get-LogicMonitorPropertySource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -PropertySourceApplyTo 'isWindows()'
+            PS C:\> Get-LogicMonitorPropertySource -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -ApplyTo 'isWindows()'
 
             In this example, the function returns PropertySources with an "applies to" filter equal to "isWindows()".
     #>
@@ -56,16 +56,13 @@
         [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
         [int]$Id,
 
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [switch]$XmlOutput,
-
         [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
-        [string]$PropertySourceName,
+        [string]$Name,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'AppliesToFilter')]
-        [string]$PropertySourceApplyTo,
+        [string]$ApplyTo,
 
-        [int]$BatchSize = 950,
+        [int]$BatchSize = 1000,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -92,12 +89,13 @@
     # Initialize variables.
     [int]$currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
     [int]$offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    [int]$PropertySourceBatchCount = 1 # Define how many times we need to loop, to get all PropertySource.
+    [int]$PropertySourceBatchCount = 1 # Define how many times we need to loop, to get all PropertySources.
     [boolean] $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all PropertySources.
     [string]$httpVerb = "GET" # Define what HTTP operation will the script run.
     [string]$resourcePath = "/setting/propertyrules" # Define the resourcePath.
     $queryParams = $null
     $propertySources = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
@@ -122,27 +120,44 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "IDFilter" {
-                If ($XmlOutput) {
-                    $queryParams = "?format=xml&offset=$offset&size=$BatchSize&sort=id"
-                }
-                Else {
-                    $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-                }
+                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "NameFilter" {
-                $queryParams = "?filter=Name:`"$PropertySourceName`"&offset=$offset&size=$BatchSize&sort=id"
+                $Name = $Name.Replace('_', '%5F')
+                $Name = $Name.Replace(' ', '%20')
+
+                $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "AppliesToFilter" {
                 # Replace special characters to better encode the URL.
-                $PropertySourceApplyTo = $PropertySourceApplyTo.Replace('(','%28').Replace(')','%29').Replace('&','%26').Replace('"','%5C%22').Replace('|','%7C').Replace('=','%3D').Replace('!','%21').Replace(' ','+').Replace('>','%3E').Replace('<','%3C').Replace('`n','%0A').Replace('`r`n','%0A')
+                $ApplyTo = $ApplyTo.Replace('"', '%2522')
+                $ApplyTo = $ApplyTo.Replace('&', '%26')
+                $ApplyTo = $ApplyTo.Replace("`r`n", "`n")
+                $ApplyTo = $ApplyTo.Replace('#', '%23')
+                $ApplyTo = $ApplyTo.Replace("`n", '%0A')
+                $ApplyTo = $ApplyTo.Replace(')', '%29')
+                $ApplyTo = $ApplyTo.Replace('(', '%28')
+                $ApplyTo = $ApplyTo.Replace('>', '%3E')
+                $ApplyTo = $ApplyTo.Replace('<', '%3C')
+                $ApplyTo = $ApplyTo.Replace('/', '%2F')
+                $ApplyTo = $ApplyTo.Replace(',', '%2C')
+                $ApplyTo = $ApplyTo.Replace('*', '%2A')
+                $ApplyTo = $ApplyTo.Replace('!', '%21')
+                $ApplyTo = $ApplyTo.Replace('=', '%3D')
+                $ApplyTo = $ApplyTo.Replace('~', '%7E')
+                $ApplyTo = $ApplyTo.Replace(' ', '%20')
+                $ApplyTo = $ApplyTo.Replace('|', '%7C')
+                $ApplyTo = $ApplyTo.Replace('$', '%24')
+                $ApplyTo = $ApplyTo.Replace('\', '%5C')
+                $ApplyTo = $ApplyTo.Replace('_', '%5F')
 
-                $queryParams = "?filter=appliesTo:`"$PropertySourceApplyTo`"&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=appliesTo:`"$ApplyTo`"&offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -180,16 +195,28 @@
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error getting PropertySources. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return "Error"
+                }
+            }
         }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, {1} function will exit. The specific error message is: {2}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
-        
-            Return
-        }
+        While ($stopLoop -eq $false)
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllPropertySources" {
@@ -197,7 +224,7 @@
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no PropertySource ID is provided...
-                $propertySource += $response.items
+                $propertySources += $response.items
 
                 $message = ("{0}: There are {1} PropertySources in `$propertySources." -f (Get-Date -Format s), $($propertySources.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -223,7 +250,7 @@
                 # Increment the variable, so we know when we have retrieved all PropertySources.
                 $currentBatchNum++
             }
-            {$_ -in ("IDFilter", "NameFilter", "AppliesToFilter")} {
+            {$_ -in ("NameFilter", "IDFilter")} {
                 $message = ("{0}: Entering switch statement for single-PropertySource retrieval." -f (Get-Date -Format s))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
@@ -232,27 +259,48 @@
                 $message = ("{0}: There are {1} PropertySources in `$PropertySources." -f (Get-Date -Format s), $($propertySources.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                # The first time through the loop, figure out how many times we need to loop (to get all PropertySources).
-                If ($firstLoopDone -eq $false) {
-                    [int]$PropertySourceBatchCount = ((($response.data.total) / 250) + 1)
-
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all PropertySources." -f (Get-Date -Format s), $PropertySourceBatchCount)
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
-
-                    $firstLoopDone = $True
-
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
-                }
-
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $ConfigSourceBatchCount)
+                Return $propertySources
+            }
+            {$_ -in ("NameFilter", "AppliesToFilter")} {
+                $message = ("{0}: Entering switch statement for filtered-PropertySource retrieval." -f (Get-Date -Format s))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                # Increment the variable, so we know when we have retrieved all PropertySources.
-                $currentBatchNum++
+                If ($response.total -eq 1) {
+                    $message = ("{0}: Found a single PropertySource." -f (Get-Date -Format s))
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    $propertySources = $response.items
+
+                    Return $propertySources
+                }
+                Else {
+                    $propertySources += $response.items
+
+                    $message = ("{0}: There are {1} PropertySources in `$PropertySources." -f (Get-Date -Format s), $($propertySources.count))
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    # The first time through the loop, figure out how many times we need to loop (to get all PropertySources).
+                    If ($firstLoopDone -eq $false) {
+                        [int]$PropertySourceBatchCount = ((($response.data.total) / 250) + 1)
+
+                        $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all PropertySources." -f (Get-Date -Format s), $PropertySourceBatchCount)
+                        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                        $firstLoopDone = $True
+
+                        $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                    }
+
+                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $ConfigSourceBatchCount)
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+
+                    # Increment the variable, so we know when we have retrieved all PropertySources.
+                    $currentBatchNum++
+                }
             }
         }
     }
 
-    Return $propertySource
-} #1.0.0.0
+    Return $propertySources
+} #1.0.0.2

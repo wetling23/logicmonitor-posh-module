@@ -1,6 +1,6 @@
 ﻿Function Start-LogicMonitorDeviceSdt {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Starts standard down time (SDT) for a device in LogicMonitor.
         .NOTES
             Author: Mike Hashemi
@@ -14,6 +14,10 @@
             V1.0.0.3 date: 11 February 2019
                 - Added support for time zones.
                 - Updated message output.
+            V1.0.0.5 date: 14 March 2019
+                - Added support for rate-limited re-try.
+            V1.0.0.6 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
 
         .PARAMETER AccessId
@@ -92,6 +96,7 @@
         #Request Info
         $httpVerb = 'POST'
         $resourcePath = "/sdt/sdts"
+        [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
         $comment += "...SDT initiated via Start-LogicMonitorDeviceSdt"
@@ -221,16 +226,29 @@
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
-        }
-        Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $response)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
 
-            Return $response
+                $stopLoop = $True
+            }
+            Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error starting SDT. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+
+                    Return $response
+                }
+            }
         }
+        While ($stopLoop -eq $false)
 
         Return $response
     }
-} #1.0.0.3
+} #1.0.0.6

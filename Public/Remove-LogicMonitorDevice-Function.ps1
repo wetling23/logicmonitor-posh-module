@@ -1,6 +1,6 @@
 ﻿Function Remove-LogicMonitorDevice {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Accepts a device ID, display name, or device IP/DNS name, then deletes it.
         .NOTES 
             Author: Mike Hashemi
@@ -16,6 +16,8 @@
             V1.0.0.4 date: 2 July 2018
                 - Updated white space.
                 - The cmdlet now only returns the API response (after the query is made, we'll still return "Error" if there is a problem eariler in the code).
+            V1.0.0.5 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
 
         .PARAMETER AccessId
@@ -31,19 +33,19 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceId 45
+            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 45
 
             Deletes the device with Id 45.
         .EXAMPLE
-            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceName "10.0.0.1"
+            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name "10.0.0.1"
 
             Deletes the device with name 10.0.0.1. If more than one device is returned, the function will exit.
         .EXAMPLE
-            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceDisplayName "server1 - Customer"
+            PS C:\> Remove-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName "server1 - Customer"
 
             Deletes the device with display name "server1 - Customer".
     #>
-    [CmdletBinding(DefaultParameterSetName = ’Default’)]
+    [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -54,14 +56,17 @@
         [Parameter(Mandatory = $True)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’Default’)]
-        [int]$DeviceId,
+        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Alias('DeviceId')]
+        [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’NameFilter’)]
-        [string]$DeviceDisplayName,
+        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Alias('DeviceDisplayName')]
+        [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’IPFilter’)]
-        [string]$DeviceName,
+        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Alias('DeviceName')]
+        [string]$Name,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -88,6 +93,7 @@
     $data = ""
     $httpVerb = 'DELETE'
     $queryParams = $null
+    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
@@ -97,21 +103,21 @@
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
-            $resourcePath = "/device/devices/$DeviceId"
+            $resourcePath = "/device/devices/$Id"
         }
-        NameFilter {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DeviceDisplayName)
+        "NameFilter" {
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DisplayName)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DeviceDisplayName $DeviceDisplayName -EventLogSource $EventLogSource
+            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
             
             If ($device.id) {
-                $DeviceId = $device.id
-                $resourcePath = "/device/devices/$DeviceId"
+                $Id = $device.id
+                $resourcePath = "/device/devices/$Id"
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
-                        -f (Get-Date -Format s), $DeviceDisplayName, $MyInvocation.MyCommand)
+                        -f (Get-Date -Format s), $DisplayName, $MyInvocation.MyCommand)
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
@@ -120,28 +126,28 @@
             $message = ("{0}: The value of `$resourcePath is {1}." -f (Get-Date -Format s), $resourcePath)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
         }
-        IPFilter {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DeviceName)
+        "IPFilter" {
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $Name)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            If ($DeviceId -eq $null) {
-                $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DeviceName $DeviceName -EventLogSource $EventLogSource
+            If ($Id -eq $null) {
+                $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
             }
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
-                        -f (Get-Date -Format s), $DeviceName, $device.count, $MyInvocation.MyCommand)
+                        -f (Get-Date -Format s), $Name, $device.count, $MyInvocation.MyCommand)
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
             }
             ElseIf ($device.id) {
-                $DeviceId = $device.id
-                $resourcePath = "/device/devices/$DeviceId"
+                $Id = $device.id
+                $resourcePath = "/device/devices/$Id"
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
-                        -f (Get-Date -Format s), $DeviceName, $MyInvocation.MyCommand)
+                        -f (Get-Date -Format s), $Name, $MyInvocation.MyCommand)
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
@@ -198,11 +204,11 @@
         Return $response
     }
     ElseIf ($response.status -eq "200") {
-        $message = ("{0}: LogicMonitor reported that device {1}, was deleted." -f (Get-Date -Format s), $DeviceId)
+        $message = ("{0}: LogicMonitor reported that device {1}, was deleted." -f (Get-Date -Format s), $Id)
         If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Return $response
     }
 
     Return $response
-} #1.0.0.4
+} #1.0.0.5

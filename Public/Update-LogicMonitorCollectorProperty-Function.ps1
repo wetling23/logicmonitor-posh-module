@@ -1,4 +1,4 @@
-Function Update-LogicMonitorCollectorProperties {
+Function Update-LogicMonitorCollectorProperty {
     <#
         .DESCRIPTION
             Accepts a collector ID or description and one or more property name/value pairs, then updates the property(ies).
@@ -21,7 +21,7 @@ Function Update-LogicMonitorCollectorProperties {
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER CollectorId
             Represents the collector's ID.
-        .PARAMETER CollectorDisplayName
+        .PARAMETER DisplayName
             Represents the collectors description.
         .PARAMETER PropertyName
             Represents the name of the target property. Note that LogicMonitor properties are case sensitive.
@@ -34,7 +34,7 @@ Function Update-LogicMonitorCollectorProperties {
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorCollectorProperties -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -CollectorId 6 -PropertyNames hostname,collectorSize -PropertyValues server2,small
+            PS C:\> Update-LogicMonitorCollectorProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyNames hostname,collectorSize -PropertyValues server2,small
 
             In this example, the cmdlet will update the hostname and collectorSize properties for the collector with "6" in the ID property. The hostname will be set to "server2" and the collector size will be set to "Small". If the properties are not present, they will be added.
     #>
@@ -50,10 +50,12 @@ Function Update-LogicMonitorCollectorProperties {
         [string]$AccountName,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
-        [int]$CollectorId,
+        [Alias("CollectorId")]
+        [int]$Id,
 
         [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
-        [string]$CollectorDisplayName,
+        [Alias("CollectorDisplayName")]
+        [string]$DisplayName,
 
         [Parameter(Mandatory = $True)]
         [ValidateSet('description', 'backupAgentId', 'enableFailBack', 'resendIval', 'suppressAlertClear', 'escalatingChainId', 'collectorGroupId', 'collectorGroupName', 'enableFailOverOnCollectorDevice', 'build')]
@@ -98,13 +100,13 @@ Function Update-LogicMonitorCollectorProperties {
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
-            $resourcePath += "/$CollectorId"
+            $resourcePath += "/$Id"
         }
         NameFilter {
-            $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $CollectorDisplayName)
+            $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $DisplayName)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $collector = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDisplayName $CollectorDisplayName -EventLogSource $EventLogSource
+            $collector = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
 
             $resourcePath += "/$($collector.id)"
 
@@ -182,4 +184,6 @@ Function Update-LogicMonitorCollectorProperties {
     }
 
     Return $response
-} #1.0.0.2
+} #1.0.0.3
+New-Alias -Name Get-LogicMonitorCollectorProperty -Value Get-LogicMonitorCollectorProperties -Force
+Export-ModuleMember -Alias *

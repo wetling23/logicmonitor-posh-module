@@ -33,7 +33,7 @@ Function Add-EventLogSource {
         [Parameter(Mandatory=$True)]
         $EventLogSource
     )
-        
+
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
     If ($PSBoundParameters['Verbose']) {Write-Verbose $message}
 

@@ -1,8 +1,8 @@
-﻿Function Get-LogicMonitorDeviceGroupProperties {
+﻿Function Get-LogicMonitorDeviceGroupProperty {
     <#
         .DESCRIPTION
             Retrieves all properties (inherited and not) from a selected device group.
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 2 July 2017
                 - Initial release.
@@ -11,6 +11,8 @@
             V1.0.0.2 date: 30 August 2018
                 - Fixed a bug getting group ID when a name is provided.
                 - Updated white space.
+            V1.0.0.3 date: 14 March 2019
+                - Added support for rate-limited re-try.
         .LINK
 
         .PARAMETER AccessId
@@ -28,19 +30,19 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDeviceGroups -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
+            PS C:\> Get-LogicMonitorDeviceGroupProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
 
             In this example, the function will search for all device groups and will return their properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDeviceGroups -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -GroupId 6
+            PS C:\> Get-LogicMonitorDeviceGroupProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -GroupId 6
 
             In this example, the function will search for the device group with "6" in the ID property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDeviceGroups -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -GroupName customer1
+            PS C:\> Get-LogicMonitorDeviceGroupProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -GroupName customer1
 
             In this example, the function will search for the device group with "customer1" in the name property and will return its properties. If more than one group has the same name (e.g. "servers"), then they will all be returned.
     #>
-    [CmdletBinding(DefaultParameterSetName = ’AllGroups’)]
+    [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -51,10 +53,10 @@
         [Parameter(Mandatory = $True)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’IDFilter’)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
         [int]$GroupID,
 
-        [Parameter(Mandatory = $True, ParameterSetName = ’NameFilter’)]
+        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
         [string]$GroupName,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -74,18 +76,13 @@
     }
 
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     $message = ("{0}: Operating in the {1} parameter set." -f (Get-Date -Format s), $PsCmdlet.ParameterSetName)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
-    $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
-    $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    $groupBatchCount = 1 # Define how many times we need to loop, to get all services.
-    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all services.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $props = @{} # Initialize hash table for custom object (created later).
     $resourcePath = "/device/groups"
     $queryParams = $null
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
@@ -96,7 +93,7 @@
 
     # Update $resourcePath to filter for a specific device.
     Switch ($PsCmdlet.ParameterSetName) {
-        "NameFilter" {	
+        "NameFilter" {
             $group = Get-LogicMonitorDeviceGroups -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -GroupName $GroupName -EventLogSource $EventLogSource
 
             $groupId = $group.id
@@ -106,7 +103,7 @@
     $resourcePath += "/$groupId/properties"
 
     # Construct the query URL.
-    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
+    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
     $message = ("{0}: Building request header." -f (Get-Date -Format s))
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
@@ -128,6 +125,7 @@
     $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
     $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
     $headers.Add("Content-Type", 'application/json')
+    $headers.Add("X-Version", 2)
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
@@ -139,10 +137,12 @@
     Catch {
         $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, {1} will exit. The specific error message is: {2}" `
                 -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Return
     }
 
-    Return $response.data.items
-} #1.0.0.2
+    Return $response.items
+} #1.0.0.3
+New-Alias -Name Get-LogicMonitorDeviceGroupProperty -Value Get-LogicMonitorDeviceGroupProperties -Force
+Export-ModuleMember -Alias *
