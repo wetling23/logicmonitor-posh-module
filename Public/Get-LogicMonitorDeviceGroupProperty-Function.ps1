@@ -13,8 +13,10 @@
                 - Updated white space.
             V1.0.0.3 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.4 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -43,6 +45,7 @@
             In this example, the function will search for the device group with "customer1" in the name property and will return its properties. If more than one group has the same name (e.g. "servers"), then they will all be returned.
     #>
     [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
+    [alias('Get-LogicMonitorDeviceGroupProperties')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -143,6 +146,4 @@
     }
 
     Return $response.items
-} #1.0.0.3
-New-Alias -Name Get-LogicMonitorDeviceGroupProperty -Value Get-LogicMonitorDeviceGroupProperties -Force
-Export-ModuleMember -Alias *
+} #1.0.0.4

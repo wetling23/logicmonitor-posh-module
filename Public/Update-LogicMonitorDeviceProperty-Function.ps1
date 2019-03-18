@@ -37,8 +37,10 @@
             V1.0.0.13 date: 18 July 2018
                 - More whites space updates.
                 - Added the API's response to the return data when there is an Invoke-RestMethod failure.
+            V1.0.0.14 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -75,6 +77,7 @@
             In this example, the function will update the Location property for the device with "server1.domain.local" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Get-LogicMonitorDeviceProperties')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -285,5 +288,3 @@
 
     Return $response
 } #1.0.0.14
-New-Alias -Name Get-LogicMonitorDeviceProperty -Value Get-LogicMonitorDeviceProperties -Force
-Export-ModuleMember -Alias *

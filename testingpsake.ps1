@@ -31,6 +31,9 @@ task Build -depends Clean {
             Add-Content -Path $outPsm1 -Encoding utf8
     }
 
+    Write-Verbose "Adding Export-ModuleMember to .psm1 file."
+    Add-Content -Value 'Export-ModuleMember -Alias * -Function *' -Path $outPsm1
+
     Copy-Item -Path $srcPsd1 -Destination $outPsd1
 }
 

@@ -11,8 +11,10 @@ Function Update-LogicMonitorCollectorProperty {
                 - Updated how the $propertyData is built, based on input from Joe Tran (https://github.com/jtran1209/).
             V1.0.0.2 date: 19 July 2018
                 - Removed mandatory flag from OpType.
+            V1.0.0.3 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -39,6 +41,7 @@ Function Update-LogicMonitorCollectorProperty {
             In this example, the cmdlet will update the hostname and collectorSize properties for the collector with "6" in the ID property. The hostname will be set to "server2" and the collector size will be set to "Small". If the properties are not present, they will be added.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Get-LogicMonitorCollectorProperties')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -185,5 +188,3 @@ Function Update-LogicMonitorCollectorProperty {
 
     Return $response
 } #1.0.0.3
-New-Alias -Name Get-LogicMonitorCollectorProperty -Value Get-LogicMonitorCollectorProperties -Force
-Export-ModuleMember -Alias *

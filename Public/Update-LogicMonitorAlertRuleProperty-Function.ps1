@@ -9,8 +9,10 @@ Function Update-LogicMonitorAlertRuleProperty {
             V1.0.0.1 date: 13 August 2018
                 - Changed $queryParams to $null.
                 - Added support for pipeline input of the Id.
+            V1.0.0.2 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -35,6 +37,7 @@ Function Update-LogicMonitorAlertRuleProperty {
             In this example, the cmdlet will update the hostname and collectorSize properties for the collector with "6" in the ID property. The hostname will be set to "server2" and the collector size will be set to "Small". If the properties are not present, they will be added.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Get-LogicMonitorAlertRulesProperties')]
     Param (
         [Parameter(Mandatory = $True)]
         [string]$AccessId,
@@ -184,6 +187,4 @@ Function Update-LogicMonitorAlertRuleProperty {
             Return $response
         }
     }
-} #1.0.0.0
-New-Alias -Name Get-LogicMonitorAlertRuleProperty -Value Get-LogicMonitorAlertRulesProperties -Force
-Export-ModuleMember -Alias *
+} #1.0.0.2

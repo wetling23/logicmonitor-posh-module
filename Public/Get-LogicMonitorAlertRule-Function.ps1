@@ -12,8 +12,10 @@
                 - Added example.
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.3 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -40,6 +42,7 @@
             In this example, the function gets the properties of the alert rule with ID "1". No output is logged to the event log.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllAlertRules')]
+    [alias('Get-LogicMonitorAlertRules')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -242,6 +245,4 @@
     }
 
     Return $alertRules
-} #1.0.0.2
-New-Alias -Name Get-LogicMonitorAlertRule -Value Get-LogicMonitorAlertRules -Force
-Export-ModuleMember -Alias *
+} #1.0.0.3

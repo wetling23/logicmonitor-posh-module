@@ -10,7 +10,10 @@ Function Get-LogicMonitorCollectorAvailableVersion {
                 - Updated documentation.
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.3 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -29,6 +32,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
             Retrieves a list of the collector versions available for download.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Get-LogicMonitorCollectorAvailableVersions')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -124,6 +128,4 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.2
-New-Alias -Name Get-LogicMonitorCollectorAvailableVersion -Value Get-LogicMonitorCollectorAvailableVersions -Force
-Export-ModuleMember -Alias *
+} #1.0.0.3

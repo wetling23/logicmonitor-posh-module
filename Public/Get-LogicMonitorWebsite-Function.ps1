@@ -1,8 +1,8 @@
 ﻿Function Get-LogicMonitorWebsite {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Returns a list of LogicMonitor websites and all of their properties. By default, the function returns all websites. If a website ID, or name is provided, the function will return properties for the specified website. 
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi 
             V1.0.0.0 date: 30 January 2017
                 - Initial release.
@@ -30,9 +30,11 @@
                 - Added support for rate-limited re-try.
                 - Updated whitespace.
             V1.0.0.10 date: 15 March 2019
-                - Changed name from Get-LogicMonitorServices to Get-LogicMonitorWebsite
+                - Changed name from Get-LogicMonitorServices to Get-LogicMonitorWebsite.
+            V1.0.0.11 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-        
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -63,6 +65,7 @@
             In this example, the function will search for the website with "webMonitor1" in the name property and will return its properties.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllWebsites')]
+    [alias('Get-LogicMonitorServices')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -275,6 +278,4 @@
 
         Return $websites
     }
-} #1.0.0.10
-New-Alias -Name Get-LogicMonitorWebsite -Value Get-LogicMonitorServices -Force
-Export-ModuleMember -Alias *
+} #1.0.0.11

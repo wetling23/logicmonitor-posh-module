@@ -37,10 +37,14 @@
                 - Renamed cmdlet and added command alias.
             V1.0.0.12 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.13 date: 18 March 2019
+                - Updated in-line help.
+            V1.0.0.14 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-            
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
@@ -58,27 +62,28 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
 
             In this example, the function will search for all monitored devices and will return their properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6
 
             In this example, the function will search for the monitored device with "6" in the ID property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1
 
             In this example, the function will search for the monitored device with "server1" in the displayName property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name 10.1.1.1
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name 10.1.1.1
 
             In this example, the function will search for the monitored device with "10.1.1.1" in the name property and will return its properties.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDevices -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local
 
             In this example, the function will search for the monitored device with "server1.domain.local" (the FQDN) in the name property and will return its properties.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllDevices')]
+    [alias('Get-LogicMonitorDevices')]
     Param (
         [Parameter(Mandatory = $True)]
         [Parameter(ParameterSetName = 'AllDevices')]
@@ -122,7 +127,7 @@
 
     If (-NOT($BlockLogging)) {
         $return = Add-EventLogSource -EventLogSource $EventLogSource
-    
+
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
@@ -310,6 +315,4 @@
     }
 
     Return $devices
-} #1.0.0.12
-New-Alias -Name Get-LogicMonitorDevice -Value Get-LogicMonitorDevices -Force
-Export-ModuleMember -Alias *
+} #1.0.0.14

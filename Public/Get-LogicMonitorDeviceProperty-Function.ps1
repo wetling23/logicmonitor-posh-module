@@ -1,7 +1,7 @@
 ﻿Function Get-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
-            Retrieves all properties (inherited and not) from a selected device.    
+            Retrieves all properties (inherited and not) from a selected device.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 08 March 2017
@@ -21,8 +21,10 @@
                 - Replaced ! with -NOT.
             V1.0.0.6 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.7 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-            
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -61,6 +63,7 @@
             In this example, the function will search for the monitored device with "server1.domain.local" (the FQDN) in the name property and will return its properties.
     #>
     [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
+    [alias('Get-LogicMonitorDeviceProperties')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -181,6 +184,4 @@
     $devices = $response.items
 
     Return $devices
-} #1.0.0.6
-New-Alias -Name Get-LogicMonitorDeviceProperty -Value Get-LogicMonitorDeviceProperties -Force
-Export-ModuleMember -Alias *
+} #1.0.0.7

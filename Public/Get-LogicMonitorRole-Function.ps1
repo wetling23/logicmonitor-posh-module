@@ -8,7 +8,10 @@
                 - Initial release.
             V1.0.0.1 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.2 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -27,6 +30,7 @@
             In this example, the function gets all roles, in batches of 1000. Output is logged to the application log, and written to the host.
     #>
     [CmdletBinding()]
+    [alias('Get-LogicMonitorRoles')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -160,6 +164,4 @@
     }
 
     Return $roles
-} #1.0.0.1
-New-Alias -Name Get-LogicMonitorRole -Value Get-LogicMonitorRoles -Force
-Export-ModuleMember -Alias *
+} #1.0.0.2

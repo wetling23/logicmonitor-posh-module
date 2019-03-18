@@ -20,10 +20,12 @@
             V1.0.0.5 date: 14 March 2019
                 - Added support for rate-limited re-try.
                 - Updated whitespace.
+            V1.0.0.6 date: 18 March 2019
+                - Updated alias publishing method.
         .LINK
-            
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
@@ -44,6 +46,7 @@
             In this example, the function gets all audit log events, in batches of 1000.
     #>
     [CmdletBinding()]
+    [alias('Get-LogicMonitorAuditLogs')]
     Param (
         [Parameter(Mandatory = $True)]
         $AccessId,
@@ -207,6 +210,4 @@
     }
 
     Return $logEntries
-} #1.0.0.5
-New-Alias -Name Get-LogicMonitorAuditLog -Value Get-LogicMonitorAuditLogs -Force
-Export-ModuleMember -Alias *
+} #1.0.0.6
