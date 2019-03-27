@@ -18,6 +18,8 @@
                 - Added support for rate-limited re-try.
             V1.0.0.6 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V10.0.07 date: 27 March 2019
+                - Removed timezone parameter after discussion with LogicMonitor.
         .LINK
 
         .PARAMETER AccessId
@@ -38,8 +40,6 @@
             Represents the duration of SDT in the format days, hours, minutes (xxx:xx:xx). If no value is provided, the duration will be one hour.
         .PARAMETER Comment
             Represents the text that will show in the notes field of the SDT entry. The text "...SDT initiated via Start-LogicMonitorDeviceSdt." will be appended to the user's comment.
-        .PARAMETER TimeZone
-            Represents the time zone name of the desired zone. Valid values can be found in the TZ database at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
         .PARAMETER EventLogSource
             Default value is "LogicMonitorPowershellModule". Represents the name of the desired source, for Event Log logging.
         .PARAMETER BlockLogging
@@ -83,9 +83,6 @@
         [string]$Duration = "00:01:00",
 
         [string]$Comment,
-
-        [parameter(HelpMessage = "TZ database name: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")]
-        [string]$TimeZone,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -193,10 +190,6 @@
             }
         }
 
-        If ($TimeZone) {
-            $data.Add("TimeZone", $TimeZone)
-        }
-
         $data = ($data | ConvertTo-Json)
 
         # Construct the query URL.
@@ -216,11 +209,10 @@
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $auth = 'LMv1 ' + $accessId + ':' + $signature + ':' + $epoch
         $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", $auth)
+        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
         $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", '2')
+        $headers.Add("X-Version", 2)
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
@@ -228,7 +220,7 @@
 
         Do {
             Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -Body $data -ErrorAction Stop
 
                 $stopLoop = $True
             }
@@ -251,4 +243,4 @@
 
         Return $response
     }
-} #1.0.0.6
+} #1.0.0.7
