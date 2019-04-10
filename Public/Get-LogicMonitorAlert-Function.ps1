@@ -73,7 +73,7 @@
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
-            Write-Host $message -ForegroundColor Yellow;
+            Write-Verbose $message
 
             $BlockLogging = $True
         }
