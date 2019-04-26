@@ -41,6 +41,8 @@
                 - Updated in-line help.
             V1.0.0.14 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.15 date: 26 April 2019
+                - Added missing loop-status set.
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -261,6 +263,8 @@
                             -f (Get-Date -Format s), $deviceBatchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
+                    $firstLoopDone = $True
+
                     $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
@@ -315,4 +319,4 @@
     }
 
     Return $devices
-} #1.0.0.14
+} #1.0.0.15
