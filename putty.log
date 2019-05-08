@@ -1,0 +1,37 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2019.05.08 09:09:17 =~=~=~=~=~=~=~=~=~=~=~=
+login as: mhashemi@synoptek.com
+mhashemi@synoptek.com@lxusinvsynsrc1.synoptek.local's password: 
+Last login: Fri Apr 19 13:32:35 2019 from 10.143.2.110
+]0;mhashemi@synoptek.local@lxusinvsynsrc1:~[?1034h[mhashemi@synoptek.local@lxusinvsynsrc1 ~]$ sudo -s [K
+[sudo] password for mhashemi@synoptek.local: 
+]0;root@lxusinvsynsrc1:/home/mhashemi@synoptek.local[?1034h[root@lxusinvsynsrc1 mhashemi@synoptek.local]# sudo gitlab-rails console [K
+-------------------------------------------------------------------------------------
+ GitLab:       11.9.8-ee (c970180)
+ GitLab Shell: 8.7.1
+ postgresql:   9.6.8
+-------------------------------------------------------------------------------------
+Loading production environment (Rails 5.0.7.1)
+[?1034hirb(main):001:0> 
+irb(main):002:0> 
+irb(main):003:0> User.where(email: "Ian Kluhsman <ikluhsman@synoptek.com>[K[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[Pikluhsman@synoptek.com[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C[C")
+=> #<ActiveRecord::Relation [#<User id:5 @ikluhsman>]>
+irb(main):004:0> irb(main):003:0> User.where(email: "ikluhsman@synoptek.com")
+[1mTraceback[m (most recent call last):
+        7: from bin/rails:4:in `<main>'
+        6: from bin/rails:4:in `require'
+        5: from /opt/gitlab/embedded/lib/ruby/gems/2.5.0/gems/railties-5.0.7.1/lib/rails/commands.rb:18:in `<top (required)>'
+        4: from /opt/gitlab/embedded/lib/ruby/gems/2.5.0/gems/railties-5.0.7.1/lib/rails/commands/commands_tasks.rb:49:in `run_command!'
+        3: from /opt/gitlab/embedded/lib/ruby/gems/2.5.0/gems/railties-5.0.7.1/lib/rails/commands/commands_tasks.rb:78:in `console'
+        2: from /opt/gitlab/embedded/lib/ruby/gems/2.5.0/gems/railties-5.0.7.1/lib/rails/commands/console_helper.rb:9:in `start'
+        1: from /opt/gitlab/embedded/lib/ruby/gems/2.5.0/gems/railties-5.0.7.1/lib/rails/commands/console.rb:65:in `start'
+[1mSyntaxError ([4m(irb):4: syntax error, unexpected ':', expecting end-of-input[0;1m)[m
+[1mirb(main):003:0> User.where(email: "ikl...[m
+[1m         ^[m
+irb(main):005:0> => #<ActiveRecord::Relation [#<User id:5 @ikluhsman>]>^C
+irb(main):005:0> ^C
+irb(main):005:0> ^C
+irb(main):005:0> exit
+]0;root@lxusinvsynsrc1:/home/mhashemi@synoptek.local[root@lxusinvsynsrc1 mhashemi@synoptek.local]# exit
+exit
+]0;mhashemi@synoptek.local@lxusinvsynsrc1:~[mhashemi@synoptek.local@lxusinvsynsrc1 ~]$ exit
+logout

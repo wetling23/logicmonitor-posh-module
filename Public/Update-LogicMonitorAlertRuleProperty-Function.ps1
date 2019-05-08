@@ -11,6 +11,8 @@ Function Update-LogicMonitorAlertRuleProperty {
                 - Added support for pipeline input of the Id.
             V1.0.0.2 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.3 date: 8 May 2019
+                - This command is deprecated, in favor of Update-LogicMonitorAlertRule.
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -94,6 +96,7 @@ Function Update-LogicMonitorAlertRuleProperty {
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
     }
     Process {
+        Write-Warning ("{0} is deprecated, in favor of Update-LogicMonitorAlertRule." -f $MyInvocation.MyCommand)
         If ($PropertyNames -notcontains "name" -or $PropertyNames -notcontains "priority") {
             $message = ("{0}: The alert rule name and priority are required, but one or both were not provided. Please try again." -f (Get-Date -Format s))
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
@@ -187,4 +190,4 @@ Function Update-LogicMonitorAlertRuleProperty {
             Return $response
         }
     }
-} #1.0.0.2
+} #1.0.0.3
