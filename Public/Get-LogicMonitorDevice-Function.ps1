@@ -43,6 +43,9 @@
                 - Updated alias publishing method.
             V1.0.0.15 date: 26 April 2019
                 - Added missing loop-status set.
+            V1.0.0.16 date: 22 May 2019
+                - Modified looping.
+                - Updated date calculation.
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -87,36 +90,24 @@
     [CmdletBinding(DefaultParameterSetName = 'AllDevices')]
     [alias('Get-LogicMonitorDevices')]
     Param (
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllDevices')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        [Parameter(ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory)]
         $AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllDevices')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        [Parameter(ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory)]
         $AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllDevices')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        [Parameter(ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory)]
         $AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("DeviceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("DeviceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
         [string]$Name,
 
@@ -131,23 +122,23 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-    $message = ("{0}: Operating in the {1} parameter set." -f (Get-Date -Format s), $PsCmdlet.ParameterSetName)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    $message = ("{0}: Operating in the {1} parameter set." -f [datetime]::Now, $PsCmdlet.ParameterSetName)
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
-    $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
+    $devices = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
+    $singleDeviceCheckDone = $false # Controls when a Do loop exits, if we are getting a single dashboard (by ID or name).
     $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    $deviceBatchCount = 1 # Define how many times we need to loop, to get all devices.
     $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all devices.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/device/devices" # Define the resourcePath, based on the type of device you're searching for.
@@ -156,37 +147,36 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: The resource path is: {1}." -f (Get-Date -Format s), $resourcePath)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    $message = ("{0}: The resource path is: {1}." -f [datetime]::Now, $resourcePath)
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Update $resourcePath to filter for a specific device, when a device ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
         $resourcePath += "/$Id"
 
-        $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
-        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
+        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
     }
 
-    # Determine how many times "GET" must be run, to return all devices, then loop through "GET" that many times.
-    While ($currentBatchNum -lt $deviceBatchCount) { 
+    Do {
         Switch ($PsCmdlet.ParameterSetName) {
-            {$_ -in ("IDFilter", "AllDevices")} {
+            { $_ -in ("IDFilter", "AllDevices") } {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
             }
-            "NameFilter" {	
+            "NameFilter" {
                 $queryParams = "?filter=displayName:`"$DisplayName`"&offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
             }
             "IPFilter" {
                 $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
             }
         }
 
@@ -194,8 +184,8 @@
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
         If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f (Get-Date -Format s))
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            $message = ("{0}: Building request header." -f [datetime]::Now)
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
             # Get current time in milliseconds
             $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
@@ -217,106 +207,102 @@
             $headers.Add("X-Version", 2)
         }
 
-        # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
-        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-
-        Do {
-            Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
-
-                $stopLoop = $True
-            }
-            Catch {
-                If ($_.Exception.Message -match '429') {
-                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
-
-                    Start-Sleep -Seconds 60
-                }
-                Else {
-                    $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-
-                    Return "Error"
-                }
-            }
-        }
-        While ($stopLoop -eq $false)
-
         Switch ($PsCmdlet.ParameterSetName) {
             "AllDevices" {
-                $message = ("{0}: Entering switch statement for all-device retrieval." -f (Get-Date -Format s))
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Entering switch statement for all-device retrieval." -f [datetime]::Now)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                # If no device ID, IP/FQDN, or display name is provided...
-                $devices += $response.items
+                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: There are {1} devices in `$devices." -f (Get-Date -Format s), $($devices.count))
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                # The first time through the loop, figure out how many times we need to loop (to get all devices).
-                If ($firstLoopDone -eq $false) {
-                    [int]$deviceBatchCount = ((($response.total) / $BatchSize) + 1)
+                # Make Request
+                $message = ("{0}: Executing the REST query." -f [datetime]::Now)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices. LogicMonitor reports that there are {2} devices." `
-                            -f (Get-Date -Format s), $deviceBatchCount, $response.total)
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $stopLoop = $false
+                Do {
+                    Try {
+                        $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
 
-                    $firstLoopDone = $True
+                        $stopLoop = $True
+                        $firstLoopDone = $True
+                    }
+                    Catch {
+                        If ($_.Exception.Message -match '429') {
+                            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                            If ($BlockLogging) { Write-Host $message -ForegroundColor Yellow } Else { Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                            Start-Sleep -Seconds 60
+                        }
+                        Else {
+                            $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                            If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                            Return "Error"
+                        }
+                    }
                 }
+                While ($stopLoop -eq $false)
 
-                # Increment offset, to grab the next batch of devices.
-                $message = ("{0}: Incrementing the search offset by {1}" -f (Get-Date -Format s), $BatchSize)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                If ($firstLoopDone -and ($null -ne $response)) {
+                    # If no dashboard ID or name is provided...
+                    $devices.AddRange($response)
 
-                $offset += $BatchSize
+                    $message = ("{0}: There are {1} devices in `$devices." -f [datetime]::Now, $devices.count)
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $deviceBatchCount)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                    # Increment offset, to grab the next batch of devices.
+                    $message = ("{0}: Incrementing the search offset by {1}." -f [datetime]::Now, $BatchSize)
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                # Increment the variable, so we know when we have retrieved all devices.
-                $currentBatchNum++
+                    $offset += $BatchSize
+                }
             }
-            # If a device ID, IP/FQDN, or display name is provided...
-            {$_ -in ("IDFilter", "NameFilter", "IPFilter")} {
-                $message = ("{0}: Entering switch statement for single-device retrieval." -f (Get-Date -Format s))
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            # If a device ID, IP, or display name is provided...
+            { $_ -in ("IDFilter", "NameFilter", "IPFilter") } {
+                $message = ("{0}: Entering switch statement for single-device retrieval." -f [datetime]::Now)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-                    $devices = $response
+                # Make Request
+                $message = ("{0}: Executing the REST query." -f [datetime]::Now)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+
+                $stopLoop = $false
+                Do {
+                    Try {
+                        $response = [System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop)
+
+                        $stopLoop = $True
+                        $firstLoopDone = $True
+                        $singleDeviceCheckDone = $True
+                    }
+                    Catch {
+                        If ($_.Exception.Message -match '429') {
+                            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                            If ($BlockLogging) { Write-Host $message -ForegroundColor Yellow } Else { Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+                            Start-Sleep -Seconds 60
+                        }
+                        Else {
+                            $message = ("{0}: Unexpected error getting device. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                            If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                            Return "Error"
+                        }
+                    }
                 }
-                Else {
-                    $devices = $response.items
-                }
+                While ($stopLoop -eq $false)
 
-                $message = ("{0}: There are {1} devices in `$devices." -f (Get-Date -Format s), $($devices.count))
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $devices.AddRange($response)
 
-                # The first time through the loop, figure out how many times we need to loop (to get all devices).
-                If ($firstLoopDone -eq $false) {
-                    [int]$deviceBatchCount = ((($response.total) / 250) + 1)
-
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all devices." -f (Get-Date -Format s), $deviceBatchCount)
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-
-                    $firstLoopDone = $True
-
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-                }
-
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $deviceBatchCount)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-
-                # Increment the variable, so we know when we have retrieved all devices.
-                $currentBatchNum++
+                $message = ("{0}: There are {1} devices in `$devices." -f [datetime]::Now, $($devices.count))
+                If (($BlockLogging) -AND ($devices['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
             }
         }
     }
+    Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
-    Return $devices
-} #1.0.0.15
+    $devices
+} #1.0.0.16
