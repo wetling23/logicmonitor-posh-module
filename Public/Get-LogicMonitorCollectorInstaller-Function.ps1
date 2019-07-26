@@ -57,40 +57,54 @@
         .PARAMETER BlockLogging
             When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -CollectorName "server1""
+            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Hostname "server1""
 
             In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector "server1". The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -CollectorID 11"
+            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11"
 
             In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector 11. The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -CollectorID 11 -Async"
+            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11 -Async"
 
             In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector 11. The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe.
             The cmdlet will continue (and exit) while the download is in progress.
     #>
     [CmdletBinding(DefaultParameterSetName = "Default")]
     Param (
-        [Parameter(Mandatory = $True, ParameterSetName = "Default")]
-        [Parameter(Mandatory = $True, ParameterSetName = "Name")]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Default")]
-        [Parameter(Mandatory = $True, ParameterSetName = "Name")]
+        [Parameter(Mandatory)]
         [string]$AccessKey,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Default")]
-        [Parameter(Mandatory = $True, ParameterSetName = "Name")]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Default")]
-        [int]$CollectorID,
+        [Parameter(Mandatory, ParameterSetName = "Default")]
+        [Alias("CollectorID")]
+        [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Name")]
-        [string]$CollectorHostName,
+        [Parameter(Mandatory, ParameterSetName = "Name")]
+        [Alias("CollectorHostName")]
+        [string]$Hostname,
 
-        [string]$OutputPath = $env:TEMP,
+        [ValidateSet("Nano", "Small", "Medium", "Large")]
+        [string]$Size = "Medium",
+
+        [ValidateSet("Win32", "Win64", "Linux32", "Linux64")]
+        [string]$Os = "Win64",
+
+        [ValidateScript( {
+                If (-Not ($_ | Test-Path) ) {
+                    Throw "File or folder does not exist"
+                }
+                If (-Not ($_ | Test-Path -PathType Container) ) {
+                    Throw "The Path argument must be a file. Folder paths are not allowed."
+                }
+                Return $true
+            })]
+        [System.IO.FileInfo]$OutputPath = $env:TEMP,
 
         [switch]$Async,
 
@@ -111,7 +125,7 @@
     }
 
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
     $hklm = 'HKLM:\SYSTEM\CurrentControlSet\Control'
@@ -123,45 +137,45 @@
 
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
-            $resourcePath = "/setting/collectors/$CollectorID/installers/Win64"
+            $resourcePath = "/setting/collectors/$Id/installers/Win64"
         }
         Name {
             Try {
-                $message = ("{0}: Searching the registry for {1}'s collectorID." -f (Get-Date -Format s), $CollectorHostName)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: Searching the registry for {1}'s collectorID." -f (Get-Date -Format s), $Hostname)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
-                [int]$collectorId = (Get-ItemProperty -Path $hklm -Name LogicMonitorCollectorID -ErrorAction Stop).LogicMonitorCollectorID
+                [int]$Id = (Get-ItemProperty -Path $hklm -Name LogicMonitorCollectorID -ErrorAction Stop).LogicMonitorCollectorID
             }
             Catch {
                 $message = ("{0}: Failed to retrieve the collector Id from the registry. The specific error is: {1}" -f (Get-Date -Format s), $_.Exception.Message)
-                If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor Yellow } Else { Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
                 Try {
                     $message = ("{0}: Attempting to retrieve the collector ID from LogicMonitor." -f (Get-Date -Format s), $_.Exception.Message)
-                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                     # LogicMonitor for the collector hostname and return the id property value, for the one collector matching the desired hostname.
-                    $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorHostname $CollectorHostName
+                    $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorHostname $Hostname
                 }
                 Catch {
                     $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, the function Get-LogicMonitorCollectorInstaller will exit. The specific error is: {1}" -f `
                         (Get-Date -Format s), $_.Exception.Message)
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                    If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
             }
 
             If ($collector.Id -as [int]) {
-                $message = ("{0}: The ID property of {1} is {2}." -f (Get-Date -Format s), $CollectorHostName, $collector.Id)
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                $message = ("{0}: The ID property of {1} is {2}." -f (Get-Date -Format s), $Hostname, $collector.Id)
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 $resourcePath = "/setting/collectors/$($collector.Id)/installers/Win64"
             }
             Else {
                 $message = ("{0}: The search of LogicMonitor for {1}'s collector ID value returned a non-number. The value is: {2}. To prevent errors, the {3} function will exit." -f `
-                    (Get-Date -Format s), $CollectorHostName, $collector.Id, $MyInvocation.MyCommand)
-                If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                    (Get-Date -Format s), $Hostname, $collector.Id, $MyInvocation.MyCommand)
+                If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
@@ -193,7 +207,7 @@
     Switch ($Async) {
         $True {
             $message = ("{0}: Beginning download of the LogicMonitor Collector installer to {1}. {2} will continue while the download is in progress." -f (Get-Date -Format s), $OutputPath, $MyInvocation.MyCommand)
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
             Try {
                 $webClient.DownloadFileAsync($url, "$OutputPath\lmInstaller.exe")
@@ -201,7 +215,7 @@
             }
             Catch {
                 $message = ("{0}: Unexpected error downloading the LogicMonitor Collector installer. The specific error is: {1}" -f (Get-Date -Format s), $_.Exception.Message)
-                If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
@@ -210,7 +224,7 @@
         }
         $False {
             $message = ("{0}: Beginning download of the LogicMonitor Collector installer to {1}. {2} will continue when the download is complete." -f (Get-Date -Format s), $OutputPath, $MyInvocation.MyCommand)
-            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
             Try {
                 $webClient.DownloadFile($url, "$OutputPath\lmInstaller.exe")
@@ -218,21 +232,21 @@
             }
             Catch {
                 $message = ("{0}: Unexpected error downloading the LogicMonitor Collector installer. The specific error is: {1}" -f (Get-Date -Format s), $_.Exception.Message)
-                If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
 
             If ((Test-Path -Path "$OutputPath\lmInstaller.exe") -and ((Get-Item -Path "$OutputPath\lmInstaller.exe").Length -gt 10MB)) {
                 $message = ("{0}: The LogicMonitor installer was downloaded. Returning the download path." -f (Get-Date -Format s))
-                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+                If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 Return "$OutputPath\lmInstaller.exe"
             }
             Else {
                 $message = ("{0}: There was no detectable error downloading the LogicMonitor installer, but it is not present in the download location ({1}). To prevent errors, the function {2} will exit" `
                         -f (Get-Date -Format s), $OutputPath, $MyInvocation.MyCommand)
-                If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
