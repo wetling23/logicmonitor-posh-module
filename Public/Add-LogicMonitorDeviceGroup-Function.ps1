@@ -153,7 +153,7 @@
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
+        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
             $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f (Get-Date -Format s), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
