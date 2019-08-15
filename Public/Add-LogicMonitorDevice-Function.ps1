@@ -36,8 +36,9 @@
                 - Replaced ! with -NOT.
             V1.0.0.12 date: 13 March 2019
                 - Updated whitespace.
+            V1.0.1.0 date: 15 August 2019
         .LINK
-            
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -63,43 +64,51 @@
         .PARAMETER LogPath
             Path where the function should store its log. When omitted, output will be sent to the shell.
         .EXAMPLE
-            PS C:\> Add-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceDisplayName device1 -DeviceName 10.0.0.0 -PreferredCollectorID 459 -HostGroupID 379 -PropertyNames location -PropertyValues Denver
+            PS C:\> $table = @{
+                        name = '10.1.1.2'
+                        displayName = 'server1'
+                        preferredCollectorId = '10'
+                    }
+            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new device with the following properties:
-                - IP: 10.0.0.0
-                - Display name: device1
-                - Preferred collector: 459
-                - Host group: 379
-                - Location: Denver
+                - Name: 10.1.1.2
+                - Display name: server1
+                - Preferred collector ID: 10
+        .EXAMPLE
+            PS C:\> $table = @{
+                        name = '10.1.1.2'
+                        displayName = 'server1'
+                        preferredCollectorId = '10'
+                        customProperties = @(
+                            @{
+                                name = 'testProperty'
+                                value = 'someValue'
+                            }
+                        )
+                    }
+            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+
+            In this example, the function will create a new device with the following properties:
+                - Name: 10.1.1.2
+                - Display name: server1
+                - Preferred collector ID: 10
+                - Custom property name: testProperty
+                - Custom property value: someValue
     #>
     [CmdletBinding()]
     Param (
         [Parameter(Mandatory = $True)]
-        $AccessId,
-        
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [string]$AccessId,
 
         [Parameter(Mandatory = $True)]
-        $AccountName,
+        [string]$AccessKey,
 
         [Parameter(Mandatory = $True)]
-        [string]$DeviceDisplayName,
+        [string]$AccountName,
 
         [Parameter(Mandatory = $True)]
-        [string]$DeviceName,
-
-        [Parameter(Mandatory = $True)]
-        [int]$PreferredCollectorID,
-
-        [Parameter(Mandatory = $True)]
-        [string]$HostGroupID,
-
-        [string]$Description,
-
-        [string[]]$PropertyNames,
-
-        [string[]]$PropertyValues,
+        [hashtable]$Properties,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
 
@@ -111,54 +120,42 @@
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
-            Write-Host $message -ForegroundColor Yellow;
+            Write-Host $message
 
             $BlockLogging = $True
         }
     }
 
     $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
-    [int]$index = 0
-    $propertyData = ""
-    $data = ""
     $httpVerb = "POST" # Define what HTTP operation will the script run.
     $resourcePath = "/device/devices"
-    $requiredProperties = "`"name`":`"$DeviceName`",`"displayName`":`"$DeviceDisplayName`",`"preferredCollectorId`":$PreferredCollectorID,`"hostGroupIds`":`"$HostGroupID`""
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    If ($Description) {
-        $message = ("{0}: Appending `"description`" to the list of properties." -f (Get-Date -Format s))
-        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    # Checking for the required properties
+    If (-NOT($Properties.ContainsKey('name'))) {
+        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request.")
+        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
-        $requiredProperties += ",`"description`":`"$Description`""
+        Return "Error"
+    }
+    If (-NOT($Properties.ContainsKey('displayName'))) {
+        $message = ("{0}: No display name provided. Please update the provided properties and re-submit the request.")
+        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+        Return "Error"
+    }
+    If (-NOT($Properties.ContainsKey('preferredCollectorId'))) {
+        $message = ("{0}: No preferred collector ID provided. Please update the provided properties and re-submit the request.")
+        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+        Return "Error"
     }
 
-    # For each property, assign the name and value to $propertyData...
-    Foreach ($property in $PropertyNames) {    
-        $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f (Get-Date -Format s), $property, $($PropertyValues[$index]))
-        If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-
-        $propertyData += "{`"name`":`"$property`",`"value`":`"$($PropertyValues[$index])`"},"
-        $index++
-    }
-
-    #...trim the trailing comma...
-    $propertyData = $propertyData.TrimEnd(",")
-
-    #...and assign the entire string to the $data variable.
-    If ($propertyData) {
-        $data = "{$requiredProperties,`"customProperties`":[$propertyData]}"
-    }
-    Else {
-        $data = "{$requiredProperties}"
-    }
-
-    $message = ("{0}: The value of `$data, is: {1}." -f (Get-Date -Format s), $data)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    $data = ($Properties | ConvertTo-Json)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -171,7 +168,7 @@
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
@@ -180,42 +177,27 @@
     $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
     $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
     $headers.Add("Content-Type", 'application/json')
+    $headers.Add("X-Version", 2)
 
     # Make Request
     $message = ("{0}: Executing the REST query ({1})." -f (Get-Date -Format s), $url)
-    If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     Try {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the Add-LogicMonitorDevice function will exit. The specific error message is: {1}" -f (Get-Date -Format s), $_.Message.Exception)
-        If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-        write-host "response: $response"
-        Return "Failure"
+        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
+            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f (Get-Date -Format s), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        }
+        Else {
+            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f (Get-Date -Format s), $Properties.Name, $_.Exception.Message)
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        }
+
+        Return "Error"
     }
 
-    Switch ($response.status) {
-        "200" {
-            $message = ("{0}: Successfully added the device in LogicMonitor." -f (Get-Date -Format s))
-            If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
-
-            Return "Success"
-        }
-        "600" {
-            $message = ("{0}: LogicMonitor reported that there is a duplicate device. Verify that the device you are adding has an IP (or DNS) name unique to the preferred collector and a display name unique to LogicMonitor. The specific message was: {1}" `
-                    -f (Get-Date -Format s), $response.errmsg)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-
-            Return "Failure (600)"
-        }
-        Default {
-            $message = ("{0}: Unexpected error creating a new device in LogicMonitor. To prevent errors, the Add-LogicMonitorDevice function will exit. The status was: {1} and the error was: `"{2}`"" `
-                    -f (Get-Date -Format s), $response.status, $response.errmsg)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
-
-            Return "Failure"
-        }
-    }
-}
-#1.0.0.12
+    $response
+} #1.0.1.0
