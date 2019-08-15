@@ -58,6 +58,9 @@
             In this example, the function will create a new DeviceGroup with the following properties:
                 - Name: group1
                 - Group ID of the parent: 1
+                - Applies to: isLinux()
+                - Custom property name: testProperty
+                - Custom property value: someValue
     #>
     [CmdletBinding()]
     Param (
