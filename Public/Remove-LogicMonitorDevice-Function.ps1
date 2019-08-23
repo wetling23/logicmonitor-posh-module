@@ -19,6 +19,7 @@
             V1.0.0.5 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.6 date: 15 April 2019
+            V1.0.0.7 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -82,14 +83,14 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
@@ -102,7 +103,7 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: Updated `$resourcePath. The value is {1}." -f (Get-Date -Format s), $resourcePath)
+    $message = ("{0}: Updated `$resourcePath. The value is {1}." -f [datetime]::Now, $resourcePath)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
@@ -111,7 +112,7 @@
             $resourcePath = "/device/devices/$Id"
         }
         "NameFilter" {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $DisplayName)
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f [datetime]::Now, $DisplayName)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
             $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
@@ -121,17 +122,17 @@
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
-                        -f (Get-Date -Format s), $DisplayName, $MyInvocation.MyCommand)
+                        -f [datetime]::Now, $DisplayName, $MyInvocation.MyCommand)
                 If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
 
-            $message = ("{0}: The value of `$resourcePath is {1}." -f (Get-Date -Format s), $resourcePath)
+            $message = ("{0}: The value of `$resourcePath is {1}." -f [datetime]::Now, $resourcePath)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
         }
         "IPFilter" {
-            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f (Get-Date -Format s), $Name)
+            $message = ("{0}: Attempting to retrieve the device ID of {1}." -f [datetime]::Now, $Name)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
             If ($Id -eq $null) {
@@ -140,7 +141,7 @@
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
-                        -f (Get-Date -Format s), $Name, $device.count, $MyInvocation.MyCommand)
+                        -f [datetime]::Now, $Name, $device.count, $MyInvocation.MyCommand)
                 If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
@@ -151,13 +152,13 @@
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
-                        -f (Get-Date -Format s), $Name, $MyInvocation.MyCommand)
+                        -f [datetime]::Now, $Name, $MyInvocation.MyCommand)
                 If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
 
-            $message = ("{0}: The value of `$resourcePath is {1}." -f (Get-Date -Format s), $resourcePath)
+            $message = ("{0}: The value of `$resourcePath is {1}." -f [datetime]::Now, $resourcePath)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
         }
     }
@@ -165,7 +166,7 @@
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-    $message = ("{0}: The value of `$url is {1}." -f (Get-Date -Format s), $url)
+    $message = ("{0}: The value of `$url is {1}." -f [datetime]::Now, $url)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Get current time in milliseconds
@@ -188,7 +189,7 @@
     $headers.Add("X-Version", 2)
 
     # Make Request
-    $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+    $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) { Write-Verbose $message } ElseIf ($PSBoundParameters['Verbose']) { Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     Try {
@@ -196,11 +197,11 @@
     }
     Catch {
         If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f (Get-Date -Format s), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
+            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
         Else {
-            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". The specific error is: {2}" -f (Get-Date -Format s), $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -208,4 +209,4 @@
     }
 
     Return $response
-} #1.0.0.6
+} #1.0.0.7

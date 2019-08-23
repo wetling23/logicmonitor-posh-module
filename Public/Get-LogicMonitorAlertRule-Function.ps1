@@ -14,6 +14,7 @@
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.4 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -72,14 +73,14 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = Write-Output ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = Write-Output ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
@@ -98,7 +99,7 @@
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
         $resourcePath += "/$Id"
 
-        $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
+        $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
     }
 
@@ -108,13 +109,13 @@
             {$_ -in ("IDFilter", "AllAlertRules")} {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "NameFilter" {
                 $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
         }
@@ -123,7 +124,7 @@
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
         If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f (Get-Date -Format s))
+            $message = ("{0}: Building request header." -f [datetime]::Now)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             # Get current time in milliseconds
@@ -147,7 +148,7 @@
         }
 
         # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Do {
@@ -158,13 +159,13 @@
             }
             Catch {
                 If ($_.Exception.Message -match '429') {
-                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
 
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting alert rules. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Unexpected error getting alert rules. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                     Return "Error"
@@ -175,13 +176,13 @@
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllAlertRules" {
-                $message = ("{0}: Entering switch statement for all-alert rule retrieval." -f (Get-Date -Format s))
+                $message = ("{0}: Entering switch statement for all-alert rule retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no device ID, IP/FQDN, or display name is provided...
                 $alertRules += $response.items
 
-                $message = ("{0}: There are {1} alert rules in `$alertRules." -f (Get-Date -Format s), $($alertRules.count))
+                $message = ("{0}: There are {1} alert rules in `$alertRules." -f [datetime]::Now, $($alertRules.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all alert rules).
@@ -189,20 +190,20 @@
                     [int]$batchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all alert rules. LogicMonitor reports that there are {2} alert rules." `
-                            -f (Get-Date -Format s), $batchCount, $response.total)
+                            -f [datetime]::Now, $batchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                    $message = ("{0}: Completed the first loop." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
                 # Increment offset, to grab the next batch of alert rules.
-                $message = ("{0}: Incrementing the search offset by {1}" -f (Get-Date -Format s), $BatchSize)
+                $message = ("{0}: Incrementing the search offset by {1}" -f [datetime]::Now, $BatchSize)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 $offset += $BatchSize
 
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $batchCount)
+                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f [datetime]::Now, $currentBatchNum, $batchCount)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # Increment the variable, so we know when we have retrieved all alert rules.
@@ -210,7 +211,7 @@
             }
             # If a device ID, IP/FQDN, or display name is provided...
             {$_ -in ("IDFilter", "NameFilter")} {
-                $message = ("{0}: Entering switch statement for single-alert retrieval." -f (Get-Date -Format s))
+                $message = ("{0}: Entering switch statement for single-alert retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
@@ -220,7 +221,7 @@
                     $alertRules += $response.items
                 }
 
-                $message = ("{0}: There are {1} alert rules in `$alertRules." -f (Get-Date -Format s), $($alertRules.count))
+                $message = ("{0}: There are {1} alert rules in `$alertRules." -f [datetime]::Now, $($alertRules.count))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all alert rules).
@@ -228,14 +229,14 @@
                     [int]$batchCount = ((($response.total) / $BatchSize) + 1)
 
                     $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all alert rules. LogicMonitor reports that there are {2} alert rules." `
-                            -f (Get-Date -Format s), $batchCount, $response.total)
+                            -f [datetime]::Now, $batchCount, $response.total)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                    $message = ("{0}: Completed the first loop." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $batchCount)
+                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f [datetime]::Now, $currentBatchNum, $batchCount)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # Increment the variable, so we know when we have retrieved all alert rules.
@@ -245,4 +246,4 @@
     }
 
     Return $alertRules
-} #1.0.0.3
+} #1.0.0.4

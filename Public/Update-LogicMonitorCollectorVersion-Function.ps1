@@ -9,8 +9,9 @@ Function Update-LogicMonitorCollectorVersion {
             V1.0.0.1 date: 7 September 2018
                 - Updated in-line documents.
                 - Removed $StartTime. We still support the idea, just with different syntax. See examples.
+            V1.0.0.2 date: 23 August 2019
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -89,17 +90,17 @@ Function Update-LogicMonitorCollectorVersion {
             $return = Add-EventLogSource -EventLogSource $EventLogSource
 
             If ($return -ne "Success") {
-                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
                 Write-Host $message -ForegroundColor Yellow;
 
                 $BlockLogging = $True
             }
         }
 
-        $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+        $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
-        $message = ("{0}: Validating start time/date." -f (Get-Date -Format s))
+        $message = ("{0}: Validating start time/date." -f [datetime]::Now)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         If ($StartDate -eq $null) {
@@ -115,19 +116,19 @@ Function Update-LogicMonitorCollectorVersion {
                 $resourcePath += "/$Id"
             }
             "Name" {
-                $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f (Get-Date -Format s), $Description)
+                $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f [datetime]::Now, $Description)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDescriptionName $Description -EventLogSource $EventLogSource
 
                 $resourcePath += "/$($collector.id)"
 
-                $message = ("{0}: The value of `$resourcePath is {1}." -f (Get-Date -Format s), $resourcePath)
+                $message = ("{0}: The value of `$resourcePath is {1}." -f [datetime]::Now, $resourcePath)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
             }
         }
 
-        $message = ("{0}: Finished updating `$resourcePath. The value is:`r`n {1}." -f (Get-Date -Format s), $resourcePath)
+        $message = ("{0}: Finished updating `$resourcePath. The value is:`r`n {1}." -f [datetime]::Now, $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # Sleeping because we get an error about scheduling, if we don't wait.
@@ -145,7 +146,7 @@ Function Update-LogicMonitorCollectorVersion {
         # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
         $data = $propertyData | ConvertTo-Json -Depth 6
 
-        $message = ("{0}: Finished updating `$data. The value update is {1}." -f (Get-Date -Format s), $data)
+        $message = ("{0}: Finished updating `$data. The value update is {1}." -f [datetime]::Now, $data)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # Construct the query URL.
@@ -171,7 +172,7 @@ Function Update-LogicMonitorCollectorVersion {
         $headers.Add("X-Version", '2')
 
         # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Try {
@@ -179,14 +180,14 @@ Function Update-LogicMonitorCollectorVersion {
         }
         Catch {
             $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
+                    -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
 
             Return "Error", $response
         }
 
         If ($response.status -ne "1") {
-            $message = ("{0}: LogicMonitor reported an error (status {1})." -f (Get-Date -Format s), $response.status)
+            $message = ("{0}: LogicMonitor reported an error (status {1})." -f [datetime]::Now, $response.status)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417}
         }
 

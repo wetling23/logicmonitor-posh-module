@@ -22,6 +22,7 @@
                 - Updated whitespace.
             V1.0.0.6 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.7 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -72,14 +73,14 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
@@ -122,7 +123,7 @@
 
     # Retrieve log entires.
     While ($loopDone -ne $true) {
-        $message = ("{0}: The request loop has run {1} times." -f (Get-Date -Format s), $batchCount)
+        $message = ("{0}: The request loop has run {1} times." -f [datetime]::Now, $batchCount)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         $queryParams = "?offset=$offset&size=$BatchSize&&filter=happenedOn<:$endDate,happenedOn>:$startDate"
@@ -132,7 +133,7 @@
 
         # Build header.
         If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f (Get-Date -Format s))
+            $message = ("{0}: Building request header." -f [datetime]::Now)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             # Get current time in milliseconds
@@ -158,7 +159,7 @@
         }
 
         # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Do {
@@ -169,13 +170,13 @@
             }
             Catch {
                 If ($_.Exception.Message -match '429') {
-                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
 
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting audit log entries. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Unexpected error getting audit log entries. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                     Return "Error"
@@ -188,10 +189,10 @@
 
         If ($response.data.items.Count -eq $BatchSize) {
             # The response was full of log entries (up to the number in $BatchSize), so there are probably more. Increment offset, to grab the next batch of log entries.
-            $message = ("{0}: There are more log entries to retrieve. Incrementing offset by {1}." -f (Get-Date -Format s), $BatchSize)
+            $message = ("{0}: There are more log entries to retrieve. Incrementing offset by {1}." -f [datetime]::Now, $BatchSize)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $message = ("{0}: The value of `$response.data.items.count is {1}." -f (Get-Date -Format s), $($response.data.items.Count))
+            $message = ("{0}: The value of `$response.data.items.count is {1}." -f [datetime]::Now, $($response.data.items.Count))
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $offset += $BatchSize
@@ -199,10 +200,10 @@
         }
         Else {
             # The number of returned log entries was less than the $BatchSize so we must have run out log entries to retrieve.
-            $message = ("{0}: There are no more log entries to retrieve." -f (Get-Date -Format s))
+            $message = ("{0}: There are no more log entries to retrieve." -f [datetime]::Now)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-            $message = ("{0}: The value of `$response.data.items.count is {1}." -f (Get-Date -Format s), $($response.data.items.Count))
+            $message = ("{0}: The value of `$response.data.items.count is {1}." -f [datetime]::Now, $($response.data.items.Count))
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             $loopDone = $true
@@ -210,4 +211,4 @@
     }
 
     Return $logEntries
-} #1.0.0.6
+} #1.0.0.7

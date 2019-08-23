@@ -46,6 +46,7 @@
             V1.0.0.16 date: 22 May 2019
                 - Modified looping.
                 - Updated date calculation.
+            V1.0.0.17 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -305,4 +306,4 @@
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.16
+} #1.0.0.17

@@ -21,7 +21,9 @@
                 - Replaced ! with -NOT.
             V1.0.0.6 date: 14 March 2019
                 - Updated whitespace.
+            V1.0.0.7 date: 23 August 2019
         .LINK
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -66,14 +68,14 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
@@ -87,7 +89,7 @@
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-    $message = ("{0}: Connecting to: {1}." -f (Get-Date -Format s), $url)
+    $message = ("{0}: Connecting to: {1}." -f [datetime]::Now, $url)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Get current time in milliseconds
@@ -109,7 +111,7 @@
     $headers.Add("Content-Type", 'application/json')
 
     # Make Request
-    $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+    $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     Try {
@@ -117,7 +119,7 @@
     }
     Catch {
         $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the Add-LogicMonitorCollector function will exit. The specific error was: {1}" `
-                -f (Get-Date -Format s), $_Exception.Message)
+                -f [datetime]::Now, $_Exception.Message)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
         Return "Error"
@@ -125,26 +127,26 @@
 
     Switch ($response.status) {
         "200" {
-            $message = ("{0}: Successfully created the collector in LogicMonitor." -f (Get-Date -Format s))
+            $message = ("{0}: Successfully created the collector in LogicMonitor." -f [datetime]::Now)
             If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
         }
         "1007" {
             $message = ("{0}: It appears that the web request failed. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
-                    -f (Get-Date -Format s), $response.status, $response.errmsg)
+                    -f [datetime]::Now, $response.status, $response.errmsg)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
             Return "Error"
         }
         Default {
             $message = ("{0}: Unexpected error creating a new collector in LogicMonitor. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
-                    -f (Get-Date -Format s), $response.status, $response.errmsg)
+                    -f [datetime]::Now, $response.status, $response.errmsg)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
             Return "Error"
         }
     }
 
-    $message = ("{0}: Attempting to write the collector ID {1} to the registry." -f (Get-Date -Format s), $($response.data.id))
+    $message = ("{0}: Attempting to write the collector ID {1} to the registry." -f [datetime]::Now, $($response.data.id))
     If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     Try {
@@ -153,15 +155,15 @@
     Catch {
         If ($_.Exception.Message -like "*Cannot find path*") {
             $message = ("{0}: Unable to record {1} to the registry. It appears that the key ({2}) does not exist or the account does not have permission to modify it. {3} will continue." `
-                    -f (Get-Date -Format s), $response.data.id, $hklm, $MyInvocation.MyCommand) 
+                    -f [datetime]::Now, $response.data.id, $hklm, $MyInvocation.MyCommand) 
             If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
         }
         Else {
             $message = ("{0}: Unexpected error recording {1} to the registry. No big deal, the function will continue. The specific error is: {2}" `
-                    -f (Get-Date -Format s), $response.data.id, $_.Exception.Message)
+                    -f [datetime]::Now, $response.data.id, $_.Exception.Message)
             If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
         }
     }
 
     Return $response.data.id
-} #1.0.0.6
+} #1.0.0.7

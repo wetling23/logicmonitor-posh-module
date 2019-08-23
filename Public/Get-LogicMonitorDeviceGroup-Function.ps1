@@ -33,6 +33,7 @@
                 - Updated whitespace.
             V1.0.0.11 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.12 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -95,17 +96,17 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-    $message = ("{0}: Operating in the {1} parameter set." -f (Get-Date -Format s), $PsCmdlet.ParameterSetName)
+    $message = ("{0}: Operating in the {1} parameter set." -f [datetime]::Now, $PsCmdlet.ParameterSetName)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
@@ -120,14 +121,14 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: Retrieving group properties. The resource path is: {1}." -f (Get-Date -Format s), $resourcePath)
+    $message = ("{0}: Retrieving group properties. The resource path is: {1}." -f [datetime]::Now, $resourcePath)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Update $resourcePath to filter for a specific service, when a service ID is provided by the user.
     If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
         $resourcePath += "/$Id"
 
-        $message = ("{0}: A collector ID was provided. Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
+        $message = ("{0}: A collector ID was provided. Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
     }
 
@@ -137,13 +138,13 @@
             {$_ -in ("IDFilter", "AllGroups")} {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             "NameFilter" {
                 $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
         }
@@ -152,7 +153,7 @@
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
         If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f (Get-Date -Format s))
+            $message = ("{0}: Building request header." -f [datetime]::Now)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             # Get current time in milliseconds
@@ -176,7 +177,7 @@
         }
 
         # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
         Do {
@@ -187,13 +188,13 @@
             }
             Catch {
                 If ($_.Exception.Message -match '429') {
-                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
 
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting device groups. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Unexpected error getting device groups. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                     Return "Error"
@@ -204,37 +205,37 @@
 
         Switch ($PsCmdlet.ParameterSetName) {
             "AllGroups" {
-                $message = ("{0}: Entering switch statement for all-group retrieval." -f (Get-Date -Format s))
+                $message = ("{0}: Entering switch statement for all-group retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # If no service ID, or name is provided...
                 $retrievedGroups += $response.items
 
-                $message = ("{0}: There are {1} groups in `$retrievedGroups. LogicMonitor reports a total of {2} groups." -f (Get-Date -Format s), $($retrievedGroups.count), $($response.total))
+                $message = ("{0}: There are {1} groups in `$retrievedGroups. LogicMonitor reports a total of {2} groups." -f [datetime]::Now, $($retrievedGroups.count), $($response.total))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # The first time through the loop, figure out how many times we need to loop (to get all groups).
                 If ($firstLoopDone -eq $false) {
                     [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all groups." -f (Get-Date -Format s), ($groupBatchCount - 1))
+                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all groups." -f [datetime]::Now, ($groupBatchCount - 1))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $firstLoopDone = $true
 
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                    $message = ("{0}: Completed the first loop." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
                 # Increment offset, to grab the next batch of services.
                 $offset += $BatchSize
 
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, ($groupBatchCount - 1))
+                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f [datetime]::Now, $currentBatchNum, ($groupBatchCount - 1))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
             # If a group ID, or name is provided...
             {$_ -in ("IDFilter", "NameFilter")} {
-                $message = ("{0}: Entering switch statement for single-groups retrieval." -f (Get-Date -Format s))
+                $message = ("{0}: Entering switch statement for single-groups retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
@@ -245,13 +246,13 @@
                 }
 
                 If ($retrievedGroups.count -eq 0) {
-                    $message = ("{0}: There was an error retrieving the group. LogicMonitor reported that zero groups were retrieved. The error is: {1}" -f (Get-Date -Format s), $response.errmsg)
+                    $message = ("{0}: There was an error retrieving the group. LogicMonitor reported that zero groups were retrieved. The error is: {1}" -f [datetime]::Now, $response.errmsg)
                     If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                     Return "Error"
                 }
                 Else {
-                    $message = ("{0}: There are {1} groups in `$retrievedGroups." -f (Get-Date -Format s), $($retrievedGroups.count))
+                    $message = ("{0}: There are {1} groups in `$retrievedGroups." -f [datetime]::Now, $($retrievedGroups.count))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
@@ -259,16 +260,16 @@
                 If ($firstLoopDone -eq $false) {
                     [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve groups." -f (Get-Date -Format s), ($groupBatchCount - 1))
+                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve groups." -f [datetime]::Now, ($groupBatchCount - 1))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $firstLoopDone = $True
 
-                    $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                    $message = ("{0}: Completed the first loop." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
 
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, ($groupBatchCount - 1))
+                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f [datetime]::Now, $currentBatchNum, ($groupBatchCount - 1))
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
         }
@@ -278,4 +279,4 @@
     }
 
     Return $retrievedGroups
-} #1.0.0.11
+} #1.0.0.12

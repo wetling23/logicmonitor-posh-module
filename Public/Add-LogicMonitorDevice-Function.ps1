@@ -37,6 +37,7 @@
             V1.0.0.12 date: 13 March 2019
                 - Updated whitespace.
             V1.0.1.0 date: 15 August 2019
+            V1.0.1.1 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -119,14 +120,14 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
@@ -180,7 +181,7 @@
     $headers.Add("X-Version", 2)
 
     # Make Request
-    $message = ("{0}: Executing the REST query ({1})." -f (Get-Date -Format s), $url)
+    $message = ("{0}: Executing the REST query ({1})." -f [datetime]::Now, $url)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     Try {
@@ -188,11 +189,11 @@
     }
     Catch {
         If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f (Get-Date -Format s), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
+            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
         Else {
-            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f (Get-Date -Format s), $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -200,4 +201,4 @@
     }
 
     $response
-} #1.0.1.0
+} #1.0.1.1

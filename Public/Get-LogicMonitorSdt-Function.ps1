@@ -17,8 +17,9 @@
                 - Removed SdtType from the list of mandatory parameters.Function Get-LogicMonitorSdt.
             V1.0.0.4 date: 14 March 2019
                 - Added support for rate-limited re-try.
+            V1.0.0.5 date: 23 August 2019
         .LINK
-
+            https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
             Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
@@ -104,14 +105,14 @@
             $return = Add-EventLogSource -EventLogSource $EventLogSource
 
             If ($return -ne "Success") {
-                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
                 Write-Host $message -ForegroundColor Yellow;
 
                 $BlockLogging = $True
             }
         }
 
-        $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+        $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
 
         # Update $resourcePath to filter for a specific SDT entry, when a SDT ID is provided by the user.
@@ -119,7 +120,7 @@
             {$_ -eq "Id"} {
                 $resourcePath += "/$Id"
 
-                $message = ("{0}: Updated resource path to {1}." -f (Get-Date -Format s), $resourcePath)
+                $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
             }
         }
@@ -129,7 +130,7 @@
             {$_.IsPresent} {
                 $filter += "isEffective:`"True`","
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 Continue
@@ -137,7 +138,7 @@
             {$_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT'} {
                 $filter += "type:`"$sdtType`","
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 Continue
@@ -147,7 +148,7 @@
         If ($PsCmdlet.ParameterSetName -eq "AdminName") {
             $filter += "admin:`"$AdminName`","
 
-            $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+            $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
         }
 
@@ -166,7 +167,7 @@
                         $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
                     }
 
-                    $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                    $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
                 "AdminName" {
@@ -177,7 +178,7 @@
                         $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
                     }
 
-                    $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f (Get-Date -Format s), $($PsCmdlet.ParameterSetName), $queryParams)
+                    $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
             }
@@ -186,7 +187,7 @@
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
             If ($firstLoopDone -eq $false) {
-                $message = ("{0}: Building request header." -f (Get-Date -Format s))
+                $message = ("{0}: Building request header." -f [datetime]::Now)
                 If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                 # Get current time in milliseconds
@@ -210,7 +211,7 @@
             }
 
             # Make Request
-            $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+            $message = ("{0}: Executing the REST query." -f [datetime]::Now)
             If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
             Do {
@@ -221,13 +222,13 @@
                 }
                 Catch {
                     If ($_.Exception.Message -match '429') {
-                        $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                        $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                         If ($BlockLogging) {Write-Host $message -ForegroundColor Yellow} Else {Write-Host $message -ForegroundColor Yellow; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417}
 
                         Start-Sleep -Seconds 60
                     }
                     Else {
-                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
                         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                         Return "Error"
@@ -238,12 +239,12 @@
 
             Switch ($PsCmdlet.ParameterSetName) {
                 {$_ -in ("AllSdt", "AdminName")} {
-                    $message = ("{0}: Entering switch statement for all-SDT retrieval." -f (Get-Date -Format s))
+                    $message = ("{0}: Entering switch statement for all-SDT retrieval." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $sdts += $response.items
 
-                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f (Get-Date -Format s), $($sdts.count))
+                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f [datetime]::Now, $($sdts.count))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     # The first time through the loop, figure out how many times we need to loop (to get all SDT entries).
@@ -251,34 +252,34 @@
                         [int]$sdtBatchCount = ((($response.total) / $BatchSize) + 1)
 
                         $message = ("{0}: {1} will query LogicMonitor {2} times to retrieve all SDT entries. LogicMonitor reports that there are {3} SDT entries." `
-                                -f (Get-Date -Format s), $MyInvocation.MyCommand, $sdtBatchCount, $response.total)
+                                -f [datetime]::Now, $MyInvocation.MyCommand, $sdtBatchCount, $response.total)
                         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-                        $message = ("{0}: Completed the first loop." -f (Get-Date -Format s))
+                        $message = ("{0}: Completed the first loop." -f [datetime]::Now)
                         If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                     }
 
                     # Increment offset, to grab the next batch of SDT entries.
-                    $message = ("{0}: Incrementing the search offset by {1}" -f (Get-Date -Format s), $BatchSize)
+                    $message = ("{0}: Incrementing the search offset by {1}" -f [datetime]::Now, $BatchSize)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $offset += $BatchSize
 
-                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f (Get-Date -Format s), $currentBatchNum, $sdtBatchCount)
+                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f [datetime]::Now, $currentBatchNum, $sdtBatchCount)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     # Increment the variable, so we know when we have retrieved all SDT entries.
                     $currentBatchNum++
                 }
                 "Id" {
-                    $message = ("{0}: Entering switch statement for single-SDT retrieval." -f (Get-Date -Format s))
+                    $message = ("{0}: Entering switch statement for single-SDT retrieval." -f [datetime]::Now)
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
                     $sdts = $response
 
                     Return $sdts
 
-                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f (Get-Date -Format s), $($sdts.count))
+                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f [datetime]::Now, $($sdts.count))
                     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
                 }
             }
@@ -286,4 +287,4 @@
 
         Return $sdts
     }
-} #1.0.0.4
+} #1.0.0.5

@@ -25,17 +25,18 @@ Function Add-EventLogSource {
             V1.0.0.8 date: 13 March 2018
                 - Updated whitespace.
                 - Updated output to only output status on 'verbose'.
+            V1.0.0.9 date: 23 August 2019
         .PARAMETER EventLogSource
             Mandatory parameter. This parameter is used to specify the event source, that script/modules will use for logging.
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory=$True)]
+        [Parameter(Mandatory = $True)]
         $EventLogSource
     )
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose']) {Write-Verbose $message}
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
+    If ($PSBoundParameters['Verbose']) { Write-Verbose $message }
 
     # Check if $EventLogSource exists as a source. If the shell is not elevated and the check fails to access the Security log, assume the source does not exist.
     Try {
@@ -46,19 +47,19 @@ Function Add-EventLogSource {
     }
 
     If ($sourceExists -eq $False) {
-        $message = ("{0}: The event source `"{1}`" does not exist. Prompting for elevation." -f (Get-Date -Format s), $EventLogSource)
+        $message = ("{0}: The event source `"{1}`" does not exist. Prompting for elevation." -f [datetime]::Now, $EventLogSource)
         Write-Host $message -ForegroundColor White
 
         Try {
             Start-Process PowerShell -Verb RunAs -ArgumentList "New-EventLog -LogName Application -Source $EventLogSource -ErrorAction Stop"
         }
         Catch [System.InvalidOperationException] {
-            $message = ("{0}: It appears that the user cancelled the operation." -f (Get-Date -Format s))
+            $message = ("{0}: It appears that the user cancelled the operation." -f [datetime]::Now)
             Write-Host $message -ForegroundColor Yellow
             Return "Error"
         }
         Catch {
-            $message = ("{0}: Unexpected error launching an elevated Powershell session. The specific error is: {1}" -f (Get-Date -Format s), $_.Exception.Message)
+            $message = ("{0}: Unexpected error launching an elevated Powershell session. The specific error is: {1}" -f [datetime]::Now, $_.Exception.Message)
             Write-Host $message -ForegroundColor Red
             Return "Error"
         }
@@ -66,9 +67,9 @@ Function Add-EventLogSource {
         Return "Success"
     }
     Else {
-        $message = ("{0}: The event source `"{1}`" already exists. There is no action for {2} to take." -f (Get-Date -Format s), $EventLogSource, $MyInvocation.MyCommand)
+        $message = ("{0}: The event source `"{1}`" already exists. There is no action for {2} to take." -f [datetime]::Now, $EventLogSource, $MyInvocation.MyCommand)
         Write-Verbose $message
 
         Return "Success"
     }
-} #1.0.0.8
+} #1.0.0.9

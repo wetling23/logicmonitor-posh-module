@@ -5,6 +5,7 @@
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 22 May 2019
+            V1.0.0.1 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -294,4 +295,4 @@
     Until (($null -eq $response) -or ($singleDashCheckDone))
 
     $dashboards
-} #1.0.0.0
+} #1.0.0.1

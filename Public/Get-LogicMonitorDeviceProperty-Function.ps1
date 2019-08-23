@@ -23,6 +23,7 @@
                 - Added support for rate-limited re-try.
             V1.0.0.7 date: 18 March 2019
                 - Updated alias publishing method.
+            V1.0.0.8 date: 23 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -95,17 +96,17 @@
         $return = Add-EventLogSource -EventLogSource $EventLogSource
 
         If ($return -ne "Success") {
-            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+            $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
             Write-Host $message -ForegroundColor Yellow;
 
             $BlockLogging = $True
         }
     }
 
-    $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
+    $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
-    $message = ("{0}: Operating in the {1} parameter set." -f (Get-Date -Format s), $PsCmdlet.ParameterSetName)
+    $message = ("{0}: Operating in the {1} parameter set." -f [datetime]::Now, $PsCmdlet.ParameterSetName)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Initialize variables.
@@ -115,7 +116,7 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: The resource path is: {1}." -f (Get-Date -Format s), $resourcePath)
+    $message = ("{0}: The resource path is: {1}." -f [datetime]::Now, $resourcePath)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Update $resourcePath to filter for a specific device.
@@ -129,7 +130,7 @@
             $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
 
             If ($device.count -gt 1) {
-                $message = ("{0}: Too many devices returned when searching for {1}." -f (Get-Date -Format s), $Name)
+                $message = ("{0}: Too many devices returned when searching for {1}." -f [datetime]::Now, $Name)
                 If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
                 Return "Error"
@@ -145,7 +146,7 @@
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-    $message = ("{0}: Building request header." -f (Get-Date -Format s))
+    $message = ("{0}: Building request header." -f [datetime]::Now)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     # Get current time in milliseconds.
@@ -168,14 +169,14 @@
     $headers.Add("X-Version", 2)
 
     # Make Request
-    $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
+    $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND ($PSBoundParameters['Verbose'])) {Write-Verbose $message} ElseIf ($PSBoundParameters['Verbose']) {Write-Verbose $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
 
     Try {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. PowerShell returned: {2}" -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Exception.Message)
+        $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
         If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
 
         Return "Error"
@@ -184,4 +185,4 @@
     $devices = $response.items
 
     Return $devices
-} #1.0.0.7
+} #1.0.0.8

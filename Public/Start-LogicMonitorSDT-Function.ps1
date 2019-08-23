@@ -15,8 +15,9 @@ Function Start-LogicMonitorSDT {
     V1.0.0.2 date: 23 April 2018
         - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
         - Replaced ! with -NOT.
+    V1.0.0.3 date: 23 August 2019
 .LINK
-    
+    https://github.com/wetling23/logicmonitor-posh-module
 .PARAMETER AccessId
     Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
 .PARAMETER AccessKey
@@ -96,23 +97,23 @@ Function Start-LogicMonitorSDT {
             $return = Add-EventLogSource -EventLogSource $EventLogSource
     
             If ($return -ne "Success") {
-                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f (Get-Date -Format s), $EventLogSource)
+                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
                 Write-Host $message -ForegroundColor Yellow;
 
                 $BlockLogging = $True
             }
         }
 
-        $message = ("{0}: Beginning {1}." -f (Get-Date -Format s), $MyInvocation.MyCommand)
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
+        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
         While ($Duration -notmatch $regex) {
             Write-Output ("The value for duration ({0}) is invalid. Please provide a valid SDT duration." -f $Duration)
             $Duration = Read-Host "Please enter the end duration of SDT (days:hours:minutes (999:23:59))"
         }
 
-        $message = ("{0}: Validating start time/date." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: Validating start time/date." -f [datetime]::Now)
+        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
         If (($StartDate -eq $null) -and ($StartTime -eq $null)) {
             # Neither start time nor end time provided.
@@ -137,8 +138,8 @@ Function Start-LogicMonitorSDT {
         # Split the duration into days, hours, and minutes.
         [array]$duration = $duration.Split(":")
 
-        $message = ("{0}: Configuring duration." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: Configuring duration." -f [datetime]::Now)
+        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
         # Use the start date/time + duration to determine when the end date/time.
         $endDate = $StartDate.AddDays($duration[0])
@@ -152,11 +153,11 @@ Function Start-LogicMonitorSDT {
             $input = Read-Host = "Enter the target device's ID or display name"
 
             # If the input is only digits, assign to $id, otherwise, assign to $displayName.
-            If ($input -match "^[\d\.]+$") {$id = $input} Else {$displayName = $input}
+            If ($input -match "^[\d\.]+$") { $id = $input } Else { $displayName = $input }
         }
 
-        $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Device Display Name: {4}." -f (Get-Date -Format s), $StartDate, $endDate, $Id, $DisplayName)
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Device Display Name: {4}." -f [datetime]::Now, $StartDate, $endDate, $Id, $DisplayName)
+        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
         If ($id) {
             $data = "{`"sdtType`":1,`"type`":`"DeviceSDT`",`"deviceId`":`"$Id`",`"startDateTime`":$sdtStart,`"endDateTime`":$sdtEnd}"
@@ -188,18 +189,18 @@ Function Start-LogicMonitorSDT {
         $headers.Add("Content-Type", 'application/json')
         
         # Make Request
-        $message = ("{0}: Executing the REST query." -f (Get-Date -Format s))
-        If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
+        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
         Try {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
         }
         Catch {
             $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f (Get-Date -Format s), $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor Red} Else {Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417}
+                    -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
+            If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
             Return "Error"
         }
     }
-} #1.0.0.2
+} #1.0.0.3
