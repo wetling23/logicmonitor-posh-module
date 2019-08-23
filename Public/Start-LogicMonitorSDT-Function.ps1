@@ -98,7 +98,7 @@ Function Start-LogicMonitorSDT {
     
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Host $message -ForegroundColor Yellow;
+                Write-Warning $message;
 
                 $BlockLogging = $True
             }
@@ -198,7 +198,7 @@ Function Start-LogicMonitorSDT {
         Catch {
             $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
                     -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) { Write-Host $message -ForegroundColor Red } Else { Write-Host $message -ForegroundColor Red; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
 
             Return "Error"
         }
