@@ -97,6 +97,7 @@ Function Add-LogicMonitorCollector {
             V1.0.0.6 date: 14 March 2019
                 - Updated whitespace.
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -122,16 +123,16 @@ Function Add-LogicMonitorCollector {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$CollectorDisplayName,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -175,15 +176,16 @@ Function Add-LogicMonitorCollector {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -203,7 +205,7 @@ Function Add-LogicMonitorCollector {
     Switch ($response.status) {
         "200" {
             $message = ("{0}: Successfully created the collector in LogicMonitor." -f [datetime]::Now)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
         }
         "1007" {
             $message = ("{0}: It appears that the web request failed. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
@@ -222,7 +224,7 @@ Function Add-LogicMonitorCollector {
     }
 
     $message = ("{0}: Attempting to write the collector ID {1} to the registry." -f [datetime]::Now, $($response.data.id))
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     Try {
         New-ItemProperty -Path $hklm -Name LogicMonitorCollectorID -Value $($response.data.id) -PropertyType String -Force -ErrorAction Stop | Out-Null
@@ -241,7 +243,7 @@ Function Add-LogicMonitorCollector {
     }
 
     Return $response.data.id
-} #1.0.0.7
+} #1.0.0.8
 Function Add-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -282,6 +284,7 @@ Function Add-LogicMonitorDevice {
                 - Updated whitespace.
             V1.0.1.0 date: 15 August 2019
             V1.0.1.1 date: 23 August 2019
+            V1.0.1.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -343,16 +346,16 @@ Function Add-LogicMonitorDevice {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [hashtable]$Properties,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -413,16 +416,17 @@ Function Add-LogicMonitorDevice {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey)))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query ({1})." -f [datetime]::Now, $url)
@@ -445,7 +449,7 @@ Function Add-LogicMonitorDevice {
     }
 
     $response
-} #1.0.1.1
+} #1.0.1.2
 Function Add-LogicMonitorDeviceGroup {
     <#
         .DESCRIPTION
@@ -469,6 +473,7 @@ Function Add-LogicMonitorDeviceGroup {
                 - Updated white space.
             V1.0.1.0 date: 14 August 2019
             V1.0.1.1 date: 23 August 2019
+            V1.0.1.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -513,16 +518,16 @@ Function Add-LogicMonitorDeviceGroup {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [hashtable]$Properties,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -583,16 +588,17 @@ Function Add-LogicMonitorDeviceGroup {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query ({1})." -f [datetime]::Now, $url)
@@ -616,7 +622,7 @@ Function Add-LogicMonitorDeviceGroup {
 
     $response
 }
-#1.0.1.1
+#1.0.1.2
 Function Get-LogicMonitorAlert {
     <#
         .DESCRIPTION
@@ -635,6 +641,7 @@ Function Get-LogicMonitorAlert {
             V1.0.0.5 date: 10 April 2019
                 - Updated filtering.
             V1.0.0.6 date: 23 August 2019
+            V1.0.0.7 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -666,19 +673,19 @@ Function Get-LogicMonitorAlert {
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllAlerts')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'AllAlerts')]
+        [Parameter(Mandatory, ParameterSetName = 'AllAlerts')]
         [switch]$All,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Filter')]
+        [Parameter(Mandatory, ParameterSetName = 'Filter')]
         [hashtable]$Filter,
 
         [int]$BatchSize = 1000,
@@ -742,16 +749,17 @@ Function Get-LogicMonitorAlert {
 
                     # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
+                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
                     # Construct Headers
-                    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-                    $headers.Add("Authorization", "LMv1 $AccessId`:$signature`:$epoch")
-                    $headers.Add("Content-Type", 'application/json')
-                    $headers.Add("X-Version", 2)
+                    $headers = @{
+                        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                        "Content-Type"  = "application/json"
+                        "X-Version"     = 2
+                    }
                 }
 
                 # Make Request
@@ -863,16 +871,17 @@ Function Get-LogicMonitorAlert {
 
                     # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
+                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
                     # Construct Headers
-                    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-                    $headers.Add("Authorization", "LMv1 $AccessId`:$signature`:$epoch")
-                    $headers.Add("Content-Type", 'application/json')
-                    $headers.Add("X-Version", 2)
+                    $headers = @{
+                        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                        "Content-Type"  = "application/json"
+                        "X-Version"     = 2
+                    }
                 }
 
                 # Make Request
@@ -930,6 +939,7 @@ Function Get-LogicMonitorAlertRule {
             V1.0.0.3 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -960,20 +970,20 @@ Function Get-LogicMonitorAlertRule {
     [CmdletBinding(DefaultParameterSetName = 'AllAlertRules')]
     [alias('Get-LogicMonitorAlertRules')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("AlertRuleId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("AlertRuleName")]
         [string]$Name,
 
@@ -1050,16 +1060,17 @@ Function Get-LogicMonitorAlertRule {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -1161,7 +1172,7 @@ Function Get-LogicMonitorAlertRule {
     }
 
     Return $alertRules
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorAuditLog {
     <#
         .DESCRIPTION
@@ -1187,6 +1198,7 @@ Function Get-LogicMonitorAuditLog {
             V1.0.0.6 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1213,14 +1225,14 @@ Function Get-LogicMonitorAuditLog {
     [CmdletBinding()]
     [alias('Get-LogicMonitorAuditLogs')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
         $StartDate,
 
@@ -1238,7 +1250,7 @@ Function Get-LogicMonitorAuditLog {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -1308,16 +1320,16 @@ Function Get-LogicMonitorAuditLog {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $auth = 'LMv1 ' + $accessId + ':' + $signature + ':' + $epoch
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", $auth)
-            $headers.Add("Content-Type", 'application/json')
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+            }
 
             $firstLoopDone = $true
         }
@@ -1375,7 +1387,7 @@ Function Get-LogicMonitorAuditLog {
     }
 
     Return $logEntries
-} #1.0.0.7
+} #1.0.0.8
 Function Get-LogicMonitorCollector {
     <#
         .DESCRIPTION
@@ -1417,6 +1429,7 @@ Function Get-LogicMonitorCollector {
             V1.0.0.14 date: 8 April 2019
                 - Fixed bug in collector retrieval by name/description.
             V1.0.0.15 date: 23 August 2019
+            V1.0.0.16 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1457,36 +1470,24 @@ Function Get-LogicMonitorCollector {
     [CmdletBinding(DefaultParameterSetName = 'AllCollectors')]
     [alias('Get-LogicMonitorCollectors')]
     Param (
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllCollectors')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'HostnameFilter')]
-        [Parameter(ParameterSetName = 'DescriptionFilter')]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllCollectors')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'HostnameFilter')]
-        [Parameter(ParameterSetName = 'DescriptionFilter')]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        [Parameter(ParameterSetName = 'AllCollectors')]
-        [Parameter(ParameterSetName = 'IDFilter')]
-        [Parameter(ParameterSetName = 'HostnameFilter')]
-        [Parameter(ParameterSetName = 'DescriptionFilter')]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("CollectorId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'HostnameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'HostnameFilter')]
         [Alias("CollectorHostname")]
         [string]$Hostname,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'DescriptionFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'DescriptionFilter')]
         [Alias("CollectorDescriptionName")]
         [string]$DescriptionName,
 
@@ -1502,7 +1503,7 @@ Function Get-LogicMonitorCollector {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -1575,16 +1576,17 @@ Function Get-LogicMonitorCollector {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -1694,7 +1696,7 @@ Function Get-LogicMonitorCollector {
     }
 
     Return $devices
-} #1.0.0.15
+} #1.0.0.16
 Function Get-LogicMonitorCollectorAvailableVersion {
     <#
         .DESCRIPTION
@@ -1710,6 +1712,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
             V1.0.0.3 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1732,14 +1735,14 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorCollectorAvailableVersions')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
         [int]$BatchSize = 1000,
 
@@ -1753,7 +1756,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -1787,16 +1790,17 @@ Function Get-LogicMonitorCollectorAvailableVersion {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", '2')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -1826,7 +1830,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorCollectorInstaller {
     <#
         .DESCRIPTION
@@ -1869,6 +1873,7 @@ Function Get-LogicMonitorCollectorInstaller {
             V1.0.0.13 date: 9 August 2019
             V1.0.0.14 date: 15 August 2019
             V1.0.0.15 date: 23 August 2019
+            V1.0.0.16 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1909,7 +1914,7 @@ Function Get-LogicMonitorCollectorInstaller {
         [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [string]$AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         [string]$AccountName,
@@ -2026,16 +2031,17 @@ Function Get-LogicMonitorCollectorInstaller {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Create the web client object and add headers
-    $webClient = New-Object System.Net.WebClient
-    $webClient.Headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $webClient.Headers.Add("Content-Type", 'application/json')
-    $webClient.Headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     Switch ($Async) {
@@ -2086,7 +2092,7 @@ Function Get-LogicMonitorCollectorInstaller {
             }
         }
     }
-} #1.0.0.15
+} #1.0.0.16
 Function Get-LogicMonitorCollectorUpgradeHistory {
     <#
         .DESCRIPTION
@@ -2103,6 +2109,7 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
             V1.0.0.3 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2124,14 +2131,14 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllCollectors')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
         [int]$BatchSize = 1000,
 
@@ -2145,7 +2152,7 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -2185,16 +2192,17 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", '2')
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -2255,7 +2263,7 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
     }
 
     Return $histories
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorConfigSource {
     <#
         .DESCRIPTION
@@ -2270,6 +2278,7 @@ Function Get-LogicMonitorConfigSource {
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2313,22 +2322,22 @@ Function Get-LogicMonitorConfigSource {
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllConfigSources')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'AppliesToFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'AppliesToFilter')]
         [string]$ApplyTo,
 
         [int]$BatchSize = 1000,
@@ -2452,16 +2461,17 @@ Function Get-LogicMonitorConfigSource {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", '2')
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -2576,7 +2586,7 @@ Function Get-LogicMonitorConfigSource {
     }
 
     Return $configSources
-} #1.0.0.3
+} #1.0.0.4
 Function Get-LogicMonitorDashboard {
     <#
         .DESCRIPTION
@@ -2585,6 +2595,7 @@ Function Get-LogicMonitorDashboard {
             Author: Mike Hashemi
             V1.0.0.0 date: 22 May 2019
             V1.0.0.1 date: 23 August 2019
+            V1.0.0.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2619,27 +2630,18 @@ Function Get-LogicMonitorDashboard {
     [CmdletBinding(DefaultParameterSetName = 'AllDashboards')]
     Param (
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccessId,
+        [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccountName,
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
         [int]$BatchSize = 1000,
@@ -2654,7 +2656,7 @@ Function Get-LogicMonitorDashboard {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -2726,16 +2728,17 @@ Function Get-LogicMonitorDashboard {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         Switch ($PsCmdlet.ParameterSetName) {
@@ -2874,7 +2877,7 @@ Function Get-LogicMonitorDashboard {
     Until (($null -eq $response) -or ($singleDashCheckDone))
 
     $dashboards
-} #1.0.0.1
+} #1.0.0.2
 Function Get-LogicMonitorDashboardWidget {
     <#
         .DESCRIPTION
@@ -2916,10 +2919,10 @@ Function Get-LogicMonitorDashboardWidget {
     [CmdletBinding(DefaultParameterSetName = 'IdFilter')]
     Param (
         [Parameter(Mandatory)]
-        $AccessId,
+        [string]$AccessId,
 
         [Parameter(Mandatory)]
-        $AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         $AccountName,
@@ -3020,12 +3023,27 @@ Function Get-LogicMonitorDashboardWidget {
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
-    $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
+    Try {
+        $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
+    }
+    Catch {
+        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
+            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        }
+        Else {
+            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        }
+
+        Return "Error"
+    }
 
     $response
 } #1.0.0.0
@@ -3063,6 +3081,7 @@ Function Get-LogicMonitorDataSource {
             V1.0.0.11 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
+            V1.0.0.13 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3113,27 +3132,27 @@ Function Get-LogicMonitorDataSource {
     [CmdletBinding(DefaultParameterSetName = 'AllDataSources')]
     [alias('Get-LogicMonitorDataSources')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("DataSourceId")]
         [int]$Id,
 
         [Parameter(ParameterSetName = 'IDFilter')]
         [switch]$XmlOutput,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'DisplayNameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'DisplayNameFilter')]
         [Alias("DataSourceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'AppliesToFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'AppliesToFilter')]
         [Alias("DataSourceApplyTo")]
         [string]$ApplyTo,
 
@@ -3149,7 +3168,7 @@ Function Get-LogicMonitorDataSource {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -3263,16 +3282,17 @@ Function Get-LogicMonitorDataSource {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -3404,7 +3424,7 @@ Function Get-LogicMonitorDataSource {
     }
 
     Return $dataSources
-} #1.0.0.12
+} #1.0.0.13
 Function Get-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -3454,6 +3474,7 @@ Function Get-LogicMonitorDevice {
                 - Modified looping.
                 - Updated date calculation.
             V1.0.0.17 date: 23 August 2019
+            V1.0.0.18 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3499,13 +3520,13 @@ Function Get-LogicMonitorDevice {
     [alias('Get-LogicMonitorDevices')]
     Param (
         [Parameter(Mandatory)]
-        $AccessId,
+        [string]$AccessId,
 
         [Parameter(Mandatory)]
-        $AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
-        $AccountName,
+        [string]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("DeviceId")]
@@ -3531,7 +3552,7 @@ Function Get-LogicMonitorDevice {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -3603,16 +3624,17 @@ Function Get-LogicMonitorDevice {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         Switch ($PsCmdlet.ParameterSetName) {
@@ -3713,7 +3735,7 @@ Function Get-LogicMonitorDevice {
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.17
+} #1.0.0.18
 Function Get-LogicMonitorDeviceDataSource {
     <#
         .DESCRIPTION
@@ -3728,6 +3750,7 @@ Function Get-LogicMonitorDeviceDataSource {
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3755,16 +3778,16 @@ Function Get-LogicMonitorDeviceDataSource {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ValueFromPipeline = $true)]
+        [Parameter(Mandatory, ValueFromPipeline = $true)]
         [int]$Id,
 
         [int]$BatchSize = 1000,
@@ -3819,16 +3842,17 @@ Function Get-LogicMonitorDeviceDataSource {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -3858,7 +3882,7 @@ Function Get-LogicMonitorDeviceDataSource {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.3
+} #1.0.0.4
 Function Get-LogicMonitorDeviceGroup {
     <#
         .DESCRIPTION
@@ -3895,6 +3919,7 @@ Function Get-LogicMonitorDeviceGroup {
             V1.0.0.11 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
+            V1.0.0.13 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3929,20 +3954,20 @@ Function Get-LogicMonitorDeviceGroup {
     [CmdletBinding(DefaultParameterSetName = 'AllGroups')]
     [alias('Get-LogicMonitorDeviceGroups')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("GroupID")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("GroupName")]
         [string]$Name,
 
@@ -3958,7 +3983,7 @@ Function Get-LogicMonitorDeviceGroup {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -4025,16 +4050,17 @@ Function Get-LogicMonitorDeviceGroup {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -4140,7 +4166,7 @@ Function Get-LogicMonitorDeviceGroup {
     }
 
     Return $retrievedGroups
-} #1.0.0.12
+} #1.0.0.13
 Function Get-LogicMonitorDeviceGroupProperty {
     <#
         .DESCRIPTION
@@ -4159,6 +4185,7 @@ Function Get-LogicMonitorDeviceGroupProperty {
             V1.0.0.4 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.5 date: 23 August 2019
+            V1.0.0.6 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4191,19 +4218,19 @@ Function Get-LogicMonitorDeviceGroupProperty {
     [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
     [alias('Get-LogicMonitorDeviceGroupProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [int]$GroupID,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$GroupName,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -4216,7 +4243,7 @@ Function Get-LogicMonitorDeviceGroupProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -4263,16 +4290,17 @@ Function Get-LogicMonitorDeviceGroupProperty {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -4290,7 +4318,7 @@ Function Get-LogicMonitorDeviceGroupProperty {
     }
 
     Return $response.items
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -4317,6 +4345,7 @@ Function Get-LogicMonitorDeviceProperty {
             V1.0.0.7 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.8 date: 23 August 2019
+            V1.0.0.9 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4359,24 +4388,24 @@ Function Get-LogicMonitorDeviceProperty {
     [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
     [alias('Get-LogicMonitorDeviceProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("DeviceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("DeviceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
         [string]$Name,
 
@@ -4390,7 +4419,7 @@ Function Get-LogicMonitorDeviceProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -4450,16 +4479,17 @@ Function Get-LogicMonitorDeviceProperty {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -4478,7 +4508,7 @@ Function Get-LogicMonitorDeviceProperty {
     $devices = $response.items
 
     Return $devices
-} #1.0.0.8
+} #1.0.0.9
 Function Get-LogicMonitorDeviceSdt {
     <#
         .DESCRIPTION 
@@ -4497,6 +4527,7 @@ Function Get-LogicMonitorDeviceSdt {
             V1.0.0.4 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.5 date: 23 August 2019
+            V1.0.0.6 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4524,20 +4555,20 @@ Function Get-LogicMonitorDeviceSdt {
     #>
     [CmdletBinding(DefaultParameterSetName = 'DeviceIdFilter')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "DeviceDisplayNameFilter")]
+        [Parameter(Mandatory, ParameterSetName = "DeviceDisplayNameFilter")]
         [Alias("DeviceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "DeviceIdFilter")]
+        [Parameter(Mandatory, ParameterSetName = "DeviceIdFilter")]
         [Alias("DeviceId")]
         [string]$Id,
 
@@ -4561,7 +4592,7 @@ Function Get-LogicMonitorDeviceSdt {
 
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message;
+                Write-Warning $message
 
                 $BlockLogging = $True
             }
@@ -4605,16 +4636,17 @@ Function Get-LogicMonitorDeviceSdt {
 
         # Construct signature.
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct headers.
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         Do {
             Try {
@@ -4641,7 +4673,7 @@ Function Get-LogicMonitorDeviceSdt {
 
         Return $response.items
     }
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorPropertySource {
     <#
         .DESCRIPTION 
@@ -4656,6 +4688,7 @@ Function Get-LogicMonitorPropertySource {
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4689,22 +4722,22 @@ Function Get-LogicMonitorPropertySource {
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllPropertySources')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'AppliesToFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'AppliesToFilter')]
         [string]$ApplyTo,
 
         [int]$BatchSize = 1000,
@@ -4824,16 +4857,17 @@ Function Get-LogicMonitorPropertySource {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", '2')
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -4948,7 +4982,7 @@ Function Get-LogicMonitorPropertySource {
     }
 
     Return $propertySources
-} #1.0.0.3
+} #1.0.0.4
 Function Get-LogicMonitorRole {
     <#
         .DESCRIPTION
@@ -4962,6 +4996,7 @@ Function Get-LogicMonitorRole {
             V1.0.0.2 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4984,14 +5019,14 @@ Function Get-LogicMonitorRole {
     [CmdletBinding()]
     [alias('Get-LogicMonitorRoles')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
         [int]$BatchSize = 1000,
 
@@ -5005,7 +5040,7 @@ Function Get-LogicMonitorRole {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -5046,16 +5081,17 @@ Function Get-LogicMonitorRole {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -5116,7 +5152,7 @@ Function Get-LogicMonitorRole {
     }
 
     Return $roles
-} #1.0.0.3
+} #1.0.0.4
 Function Get-LogicMonitorSdt {
     <#
         .DESCRIPTION
@@ -5137,6 +5173,7 @@ Function Get-LogicMonitorSdt {
             V1.0.0.4 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.5 date: 23 August 2019
+            V1.0.0.6 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5174,20 +5211,20 @@ Function Get-LogicMonitorSdt {
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllSdt')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias("SdtId")]
         [string]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "AdminName")]
+        [Parameter(Mandatory, ParameterSetName = "AdminName")]
         [string]$AdminName,
 
         [Parameter(ParameterSetName = "AdminName")]
@@ -5317,16 +5354,17 @@ Function Get-LogicMonitorSdt {
 
                 # Construct Signature
                 $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+                $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                 $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                 $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                 $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
                 # Construct Headers
-                $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-                $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-                $headers.Add("Content-Type", 'application/json')
-                $headers.Add("X-Version", 2)
+                $headers = @{
+                    "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                    "Content-Type"  = "application/json"
+                    "X-Version"     = 2
+                }
             }
 
             # Make Request
@@ -5406,7 +5444,7 @@ Function Get-LogicMonitorSdt {
 
         Return $sdts
     }
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorServiceProperty {
     <#
         .DESCRIPTION
@@ -5432,6 +5470,7 @@ Function Get-LogicMonitorServiceProperty {
             V1.0.0.6 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5472,20 +5511,20 @@ Function Get-LogicMonitorServiceProperty {
     [CmdletBinding(DefaultParameterSetName = 'IDFilter')]
     [alias('Get-LogicMonitorServiceProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IDFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
         [Alias("ServiceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("ServiceName")]
         [string]$Name,
 
@@ -5499,7 +5538,7 @@ Function Get-LogicMonitorServiceProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -5550,16 +5589,17 @@ Function Get-LogicMonitorServiceProperty {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -5589,7 +5629,7 @@ Function Get-LogicMonitorServiceProperty {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.7
+} #1.0.0.8
 Function Get-LogicMonitorWebsite {
     <#
         .DESCRIPTION
@@ -5626,6 +5666,7 @@ Function Get-LogicMonitorWebsite {
             V1.0.0.11 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
+            V1.0.0.13 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5660,20 +5701,20 @@ Function Get-LogicMonitorWebsite {
     [CmdletBinding(DefaultParameterSetName = 'AllWebsites')]
     [alias('Get-LogicMonitorServices')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [Alias("ServiceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("ServiceName")]
         [string]$Name,
 
@@ -5689,7 +5730,7 @@ Function Get-LogicMonitorWebsite {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -5727,7 +5768,7 @@ Function Get-LogicMonitorWebsite {
     # Determine how many times "GET" must be run, to return all websites, then loop through "GET" that many times.
     While ($currentBatchNum -lt $websiteBatchCount) { 
         Switch ($PsCmdlet.ParameterSetName) {
-            {$_ -in ("IdFilter", "AllWebsites")} {
+            { $_ -in ("IdFilter", "AllWebsites") } {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -5756,16 +5797,17 @@ Function Get-LogicMonitorWebsite {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -5829,7 +5871,7 @@ Function Get-LogicMonitorWebsite {
                 $currentBatchNum++
             }
             # If a website ID, or name is provided...
-            {$_ -in ("IDFilter", "NameFilter")} {
+            { $_ -in ("IDFilter", "NameFilter") } {
                 $message = ("{0}: Entering switch statement for single-website retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -5871,7 +5913,7 @@ Function Get-LogicMonitorWebsite {
 
         Return $websites
     }
-} #1.0.0.12
+} #1.0.0.13
 Function Remove-LogicMonitorCollector {
     <#
         .DESCRIPTION
@@ -5891,6 +5933,7 @@ Function Remove-LogicMonitorCollector {
                 - Added support for rate-limited re-try.
                 - Updated whitespace.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5912,16 +5955,16 @@ Function Remove-LogicMonitorCollector {
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [Alias("CollectorId")]
         [int]$Id,
 
@@ -5935,14 +5978,14 @@ Function Remove-LogicMonitorCollector {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
     }
 
     $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
     [int]$index = 0
@@ -5970,16 +6013,17 @@ Function Remove-LogicMonitorCollector {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -5998,7 +6042,7 @@ Function Remove-LogicMonitorCollector {
 
     # A blank response is normal, for a successful operation.
     Return $response
-} #1.0.0.4
+} #1.0.0.5
 Function Remove-LogicMonitorCollectorVersion {
     <#
         .DESCRIPTION
@@ -6012,6 +6056,7 @@ Function Remove-LogicMonitorCollectorVersion {
             V1.0.0.2 date: 14 March 2019
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6041,19 +6086,19 @@ Function Remove-LogicMonitorCollectorVersion {
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Default", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Default", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$Description,
 
         [datetime]$StartDate,
@@ -6065,8 +6110,8 @@ Function Remove-LogicMonitorCollectorVersion {
 
     Begin {
         # Initialize variables.
-        [hashtable]$downgradeProperties = @{}
-        [hashtable]$propertyData = @{}
+        [hashtable]$downgradeProperties = @{ }
+        [hashtable]$propertyData = @{ }
         [string]$data = ""
         [string]$httpVerb = "PATCH"
         [string]$queryParams = ""
@@ -6081,7 +6126,7 @@ Function Remove-LogicMonitorCollectorVersion {
 
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message;
+                Write-Warning $message
 
                 $BlockLogging = $True
             }
@@ -6148,16 +6193,17 @@ Function Remove-LogicMonitorCollectorVersion {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", '2')
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -6188,7 +6234,7 @@ Function Remove-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.3
+} #1.0.0.4
 Function Remove-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -6211,6 +6257,7 @@ Function Remove-LogicMonitorDevice {
                 - Added support for rate-limited re-try.
             V1.0.0.6 date: 15 April 2019
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6244,24 +6291,24 @@ Function Remove-LogicMonitorDevice {
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias('DeviceId')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias('DeviceDisplayName')]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias('DeviceName')]
         [string]$Name,
 
@@ -6368,16 +6415,17 @@ Function Remove-LogicMonitorDevice {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -6400,7 +6448,7 @@ Function Remove-LogicMonitorDevice {
     }
 
     Return $response
-} #1.0.0.7
+} #1.0.0.8
 Function Remove-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -6427,6 +6475,7 @@ Function Remove-LogicMonitorDeviceProperty {
             V1.0.0.6 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6463,28 +6512,28 @@ Function Remove-LogicMonitorDeviceProperty {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorDeviceProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias('DeviceId')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias('DeviceDisplayName')]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias('DeviceName')]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyNames,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -6497,7 +6546,7 @@ Function Remove-LogicMonitorDeviceProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -6600,15 +6649,16 @@ Function Remove-LogicMonitorDeviceProperty {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -6634,7 +6684,7 @@ Function Remove-LogicMonitorDeviceProperty {
     }
 
     Return "Success"
-} #1.0.0.7
+} #1.0.0.8
 Function Remove-LogicMonitorSdt {
     <#
         .DESCRIPTION
@@ -6644,6 +6694,7 @@ Function Remove-LogicMonitorSdt {
             V1.0.0.0 date: 4 April 2019
                 - Initial release.
             V1.0.0.1 date: 23 August 2019
+            V1.0.0.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6668,16 +6719,16 @@ Function Remove-LogicMonitorSdt {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias("SdtId")]
         [string]$Id,
 
@@ -6730,16 +6781,17 @@ Function Remove-LogicMonitorSdt {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -6770,7 +6822,7 @@ Function Remove-LogicMonitorSdt {
 
         Return $response
     }
-} #1.0.0.1
+} #1.0.0.2
 Function Start-LogicMonitorDeviceSdt {
     <#
         .DESCRIPTION
@@ -6791,8 +6843,9 @@ Function Start-LogicMonitorDeviceSdt {
                 - Added support for rate-limited re-try.
             V1.0.0.6 date: 14 March 2019
                 - Added support for rate-limited re-try.
-            V10.0.07 date: 27 March 2019
+            V1.0.0.7 date: 27 March 2019
                 - Removed timezone parameter after discussion with LogicMonitor.
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6832,27 +6885,27 @@ Function Start-LogicMonitorDeviceSdt {
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$DisplayName,
 
         [datetime]$StartDate,
 
-        [ValidateScript( {$_ -match '^([01]\d|2[0-3]):?([0-5]\d)$'})]
+        [ValidateScript( { $_ -match '^([01]\d|2[0-3]):?([0-5]\d)$' })]
         [string]$StartTime,
 
-        [ValidateScript( {$_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'})]
+        [ValidateScript( { $_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$' })]
         [string]$Duration = "00:01:00",
 
         [string]$Comment,
@@ -6976,16 +7029,17 @@ Function Start-LogicMonitorDeviceSdt {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -7016,7 +7070,7 @@ Function Start-LogicMonitorDeviceSdt {
 
         Return $response
     }
-} #1.0.0.7
+} #1.0.0.8
 # Need to figure out, in what format(s) I can have the user provide start and end dates. Using '06/07/2017' (for example) works, but throws an error.
 # The ElseIf for "Start date is provided. Start time is not provided." complains, but I'm not sure why. The lines work when called outside the function.
 Function Start-LogicMonitorSDT {
@@ -7232,6 +7286,7 @@ Function Update-LogicMonitorAlertRule {
             V1.0.0.0 date: 8 May 2019
                 - Initial release.
             V1.0.0.1 date: 23 August 2019
+            V1.0.0.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7280,7 +7335,7 @@ Function Update-LogicMonitorAlertRule {
         [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [string]$AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         [string]$AccountName,
@@ -7372,16 +7427,17 @@ Function Update-LogicMonitorAlertRule {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         Do {
             Try {
@@ -7414,7 +7470,7 @@ Function Update-LogicMonitorAlertRule {
 
         $response
     }
-} #1.0.0.1
+} #1.0.0.2
 Function Update-LogicMonitorAlertRuleProperty {
     <#
         .DESCRIPTION
@@ -7431,6 +7487,7 @@ Function Update-LogicMonitorAlertRuleProperty {
             V1.0.0.3 date: 8 May 2019
                 - This command is deprecated, in favor of Update-LogicMonitorAlertRule.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7459,28 +7516,28 @@ Function Update-LogicMonitorAlertRuleProperty {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorAlertRulesProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, ParameterSetName = 'Default')]
         [Alias("AlertRuleId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("AlertRuleName")]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [ValidateSet('name', 'priority', 'levelStr', 'devices', 'deviceGroups', 'datasource', 'instance', 'datapoint', 'escalationInterval', 'escalatingChainId', 'suppressAlertClear', 'suppressAlertAckSdt')]
         [string[]]$PropertyNames,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyValues,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -7494,7 +7551,7 @@ Function Update-LogicMonitorAlertRuleProperty {
 
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message;
+                Write-Warning $message
 
                 $BlockLogging = $True
             }
@@ -7575,15 +7632,16 @@ Function Update-LogicMonitorAlertRuleProperty {
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+            }
 
             # Make Request
             $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -7608,7 +7666,7 @@ Function Update-LogicMonitorAlertRuleProperty {
             Return $response
         }
     }
-} #1.0.0.4
+} #1.0.0.5
 Function Update-LogicMonitorCollectorProperty {
     <#
         .DESCRIPTION
@@ -7625,6 +7683,7 @@ Function Update-LogicMonitorCollectorProperty {
             V1.0.0.3 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
+            V1.0.0.5 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7655,28 +7714,28 @@ Function Update-LogicMonitorCollectorProperty {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorCollectorProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias("CollectorId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("CollectorDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [ValidateSet('description', 'backupAgentId', 'enableFailBack', 'resendIval', 'suppressAlertClear', 'escalatingChainId', 'collectorGroupId', 'collectorGroupName', 'enableFailOverOnCollectorDevice', 'build')]
         [string[]]$PropertyNames,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyValues,
 
         [ValidateSet('PUT', 'PATCH')]
@@ -7692,18 +7751,18 @@ Function Update-LogicMonitorCollectorProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
     }
 
     $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
     [int]$index = 0
-    [hashtable]$propertyData = @{}
+    [hashtable]$propertyData = @{ }
     [string]$standardProperties = ""
     [string]$data = ""
     [string]$httpVerb = $OpType.ToUpper()
@@ -7768,15 +7827,16 @@ Function Update-LogicMonitorCollectorProperty {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -7799,7 +7859,7 @@ Function Update-LogicMonitorCollectorProperty {
     }
 
     Return $response
-} #1.0.0.4
+} #1.0.0.5
 Function Update-LogicMonitorCollectorVersion {
     <#
         .DESCRIPTION
@@ -7812,6 +7872,7 @@ Function Update-LogicMonitorCollectorVersion {
                 - Updated in-line documents.
                 - Removed $StartTime. We still support the idea, just with different syntax. See examples.
             V1.0.0.2 date: 23 August 2019
+            V1.0.0.3 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7849,19 +7910,19 @@ Function Update-LogicMonitorCollectorVersion {
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Default", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Default", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$Description,
 
         [int]$MajorVersion,
@@ -7878,8 +7939,8 @@ Function Update-LogicMonitorCollectorVersion {
 
     Begin {
         # Initialize variables.
-        [hashtable]$upgradeProperties = @{}
-        [hashtable]$propertyData = @{}
+        [hashtable]$upgradeProperties = @{ }
+        [hashtable]$propertyData = @{ }
         [string]$data = ""
         [string]$httpVerb = "PATCH"
         [string]$queryParams = ""
@@ -7893,7 +7954,7 @@ Function Update-LogicMonitorCollectorVersion {
 
             If ($return -ne "Success") {
                 $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message;
+                Write-Warning $message
 
                 $BlockLogging = $True
             }
@@ -7962,16 +8023,17 @@ Function Update-LogicMonitorCollectorVersion {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", '2')
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -7995,7 +8057,7 @@ Function Update-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.2
+} #1.0.0.3
 Function Update-LogicMonitorDashboard {
     <#
         .DESCRIPTION
@@ -8004,6 +8066,7 @@ Function Update-LogicMonitorDashboard {
             Author: Mike Hashemi
             V1.0.0.0 date: 22 May 2019
                 - Initial release.
+            V1.0.0.1 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8039,7 +8102,7 @@ Function Update-LogicMonitorDashboard {
         [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [string]$AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         [string]$AccountName,
@@ -8118,16 +8181,17 @@ Function Update-LogicMonitorDashboard {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         Do {
             Try {
@@ -8160,7 +8224,7 @@ Function Update-LogicMonitorDashboard {
 
         $response
     }
-} #1.0.0.0
+} #1.0.0.1
 Function Update-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -8202,7 +8266,8 @@ Function Update-LogicMonitorDeviceProperty {
                 - Added the API's response to the return data when there is an Invoke-RestMethod failure.
             V1.0.0.14 date: 18 March 2019
                 - Updated alias publishing method.
-            1.0.0.15 date: 23 August 2019
+            V1.0.0.15 date: 23 August 2019
+            V1.0.0.16 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8243,31 +8308,31 @@ Function Update-LogicMonitorDeviceProperty {
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorDeviceProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias("DeviceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("DeviceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyNames,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyValues,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -8280,14 +8345,14 @@ Function Update-LogicMonitorDeviceProperty {
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
     }
 
     $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
     [int]$index = 0
@@ -8343,14 +8408,14 @@ Function Update-LogicMonitorDeviceProperty {
     # For each property, assign the name and value to $propertyData.
     Foreach ($property in $PropertyNames) {
         Switch ($property) {
-            {$_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId")} {
+            { $_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId") } {
                 $queryParams += "$property,"
 
                 $message = ("{0}: Added {1} to `$queryParams. The new value of `$queryParams is: {2}" -f [datetime]::Now, $property, $queryParams)
                 If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 $message = ("{0}: Updating/adding standard property: {1} with a value of {2}." -f [datetime]::Now, $property, $($PropertyValues[$index]))
-                If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 $standardProperties += "`"$property`":`"$($PropertyValues[$index])`","
 
@@ -8364,11 +8429,11 @@ Function Update-LogicMonitorDeviceProperty {
 
                 If ($property -like "*pass") {
                     $message = ("{0}: Updating/adding property: {1} with a value of ********." -f [datetime]::Now, $property)
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
                 }
                 Else {
                     $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f [datetime]::Now, $property, $($PropertyValues[$index]))
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
                 }
 
                 $propertyData += "{`"name`":`"$property`",`"value`":`"$($PropertyValues[$index])`"},"
@@ -8420,15 +8485,16 @@ Function Update-LogicMonitorDeviceProperty {
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -8451,7 +8517,7 @@ Function Update-LogicMonitorDeviceProperty {
     }
 
     Return $response
-} #1.0.0.15
+} #1.0.0.16
 Function Update-LogicMonitorWebsiteProperty {
     <#
         .DESCRIPTION
@@ -8465,6 +8531,7 @@ Function Update-LogicMonitorWebsiteProperty {
             V1.0.0.2 date: 15 March 2019
                 - Updated to use API v2 and changed input parameters.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8494,22 +8561,22 @@ Function Update-LogicMonitorWebsiteProperty {
     #>
     [CmdletBinding(DefaultParameterSetName = 'IdFilter')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [hashtable]$PropertyTable,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -8572,16 +8639,17 @@ y
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -8598,5 +8666,5 @@ y
     }
 
     Return $response
-} #1.0.0.3
+} #1.0.0.4
 Export-ModuleMember -Alias * -Function *

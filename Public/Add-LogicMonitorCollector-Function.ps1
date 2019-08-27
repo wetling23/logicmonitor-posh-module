@@ -22,6 +22,7 @@
             V1.0.0.6 date: 14 March 2019
                 - Updated whitespace.
             V1.0.0.7 date: 23 August 2019
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -47,16 +48,16 @@
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$CollectorDisplayName,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -100,15 +101,16 @@
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -128,7 +130,7 @@
     Switch ($response.status) {
         "200" {
             $message = ("{0}: Successfully created the collector in LogicMonitor." -f [datetime]::Now)
-            If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+            If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
         }
         "1007" {
             $message = ("{0}: It appears that the web request failed. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
@@ -147,7 +149,7 @@
     }
 
     $message = ("{0}: Attempting to write the collector ID {1} to the registry." -f [datetime]::Now, $($response.data.id))
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     Try {
         New-ItemProperty -Path $hklm -Name LogicMonitorCollectorID -Value $($response.data.id) -PropertyType String -Force -ErrorAction Stop | Out-Null
@@ -166,4 +168,4 @@
     }
 
     Return $response.data.id
-} #1.0.0.7
+} #1.0.0.8

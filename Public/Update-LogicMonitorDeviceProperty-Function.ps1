@@ -39,7 +39,8 @@
                 - Added the API's response to the return data when there is an Invoke-RestMethod failure.
             V1.0.0.14 date: 18 March 2019
                 - Updated alias publishing method.
-            1.0.0.15 date: 23 August 2019
+            V1.0.0.15 date: 23 August 2019
+            V1.0.0.16 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -80,31 +81,31 @@
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Get-LogicMonitorDeviceProperties')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Default')]
+        [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias("DeviceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("DeviceDisplayName")]
         [string]$DisplayName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IPFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyNames,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string[]]$PropertyValues,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -117,14 +118,14 @@
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
     }
 
     $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
-    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
     # Initialize variables.
     [int]$index = 0
@@ -180,14 +181,14 @@
     # For each property, assign the name and value to $propertyData.
     Foreach ($property in $PropertyNames) {
         Switch ($property) {
-            {$_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId")} {
+            { $_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId") } {
                 $queryParams += "$property,"
 
                 $message = ("{0}: Added {1} to `$queryParams. The new value of `$queryParams is: {2}" -f [datetime]::Now, $property, $queryParams)
                 If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 $message = ("{0}: Updating/adding standard property: {1} with a value of {2}." -f [datetime]::Now, $property, $($PropertyValues[$index]))
-                If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
                 $standardProperties += "`"$property`":`"$($PropertyValues[$index])`","
 
@@ -201,11 +202,11 @@
 
                 If ($property -like "*pass") {
                     $message = ("{0}: Updating/adding property: {1} with a value of ********." -f [datetime]::Now, $property)
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
                 }
                 Else {
                     $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f [datetime]::Now, $property, $($PropertyValues[$index]))
-                    If ($BlockLogging) {Write-Host $message -ForegroundColor White} Else {Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417}
+                    If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
                 }
 
                 $propertyData += "{`"name`":`"$property`",`"value`":`"$($PropertyValues[$index])`"},"
@@ -257,15 +258,16 @@
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -288,4 +290,4 @@
     }
 
     Return $response
-} #1.0.0.15
+} #1.0.0.16

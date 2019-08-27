@@ -1,11 +1,12 @@
 ﻿Function Get-LogicMonitorDashboard {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor dashboards
+            Returns a list of LogicMonitor dashboards.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 22 May 2019
             V1.0.0.1 date: 23 August 2019
+            V1.0.0.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -40,27 +41,18 @@
     [CmdletBinding(DefaultParameterSetName = 'AllDashboards')]
     Param (
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccessId,
+        [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
-        [Parameter(ParameterSetName = 'AllDashboards')]
-        [Parameter(ParameterSetName = 'IdFilter')]
-        [Parameter(ParameterSetName = 'NameFilter')]
-        $AccountName,
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
         [int]$BatchSize = 1000,
@@ -75,7 +67,7 @@
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -147,16 +139,17 @@
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         Switch ($PsCmdlet.ParameterSetName) {
@@ -295,4 +288,4 @@
     Until (($null -eq $response) -or ($singleDashCheckDone))
 
     $dashboards
-} #1.0.0.1
+} #1.0.0.2

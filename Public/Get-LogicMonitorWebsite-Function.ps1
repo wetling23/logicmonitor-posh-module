@@ -34,6 +34,7 @@
             V1.0.0.11 date: 18 March 2019
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
+            V1.0.0.13 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -68,20 +69,20 @@
     [CmdletBinding(DefaultParameterSetName = 'AllWebsites')]
     [alias('Get-LogicMonitorServices')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [Alias("ServiceId")]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("ServiceName")]
         [string]$Name,
 
@@ -97,7 +98,7 @@
 
         If ($return -ne "Success") {
             $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-            Write-Warning $message;
+            Write-Warning $message
 
             $BlockLogging = $True
         }
@@ -135,7 +136,7 @@
     # Determine how many times "GET" must be run, to return all websites, then loop through "GET" that many times.
     While ($currentBatchNum -lt $websiteBatchCount) { 
         Switch ($PsCmdlet.ParameterSetName) {
-            {$_ -in ("IdFilter", "AllWebsites")} {
+            { $_ -in ("IdFilter", "AllWebsites") } {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -164,16 +165,17 @@
 
             # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
             # Construct Headers
-            $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-            $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-            $headers.Add("Content-Type", 'application/json')
-            $headers.Add("X-Version", 2)
+            $headers = @{
+                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Content-Type"  = "application/json"
+                "X-Version"     = 2
+            }
         }
 
         # Make Request
@@ -237,7 +239,7 @@
                 $currentBatchNum++
             }
             # If a website ID, or name is provided...
-            {$_ -in ("IDFilter", "NameFilter")} {
+            { $_ -in ("IDFilter", "NameFilter") } {
                 $message = ("{0}: Entering switch statement for single-website retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -279,4 +281,4 @@
 
         Return $websites
     }
-} #1.0.0.12
+} #1.0.0.13

@@ -11,6 +11,7 @@
             V1.0.0.2 date: 15 March 2019
                 - Updated to use API v2 and changed input parameters.
             V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -40,22 +41,22 @@
     #>
     [CmdletBinding(DefaultParameterSetName = 'IdFilter')]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'IdFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
         [int]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'NameFilter')]
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [hashtable]$PropertyTable,
 
         [string]$EventLogSource = 'LogicMonitorPowershellModule',
@@ -118,16 +119,17 @@ y
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Construct Headers
-    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $headers.Add("Content-Type", 'application/json')
-    $headers.Add("X-Version", 2)
+    $headers = @{
+        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 2
+    }
 
     # Make Request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -144,4 +146,4 @@ y
     }
 
     Return $response
-} #1.0.0.3
+} #1.0.0.4

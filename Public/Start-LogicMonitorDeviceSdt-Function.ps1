@@ -18,8 +18,9 @@
                 - Added support for rate-limited re-try.
             V1.0.0.6 date: 14 March 2019
                 - Added support for rate-limited re-try.
-            V10.0.07 date: 27 March 2019
+            V1.0.0.7 date: 27 March 2019
                 - Removed timezone parameter after discussion with LogicMonitor.
+            V1.0.0.8 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -59,27 +60,27 @@
     #>
     [CmdletBinding()]
     Param (
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        [string]$AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
+        [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$Id,
 
-        [Parameter(Mandatory = $True, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
+        [Parameter(Mandatory, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [string]$DisplayName,
 
         [datetime]$StartDate,
 
-        [ValidateScript( {$_ -match '^([01]\d|2[0-3]):?([0-5]\d)$'})]
+        [ValidateScript( { $_ -match '^([01]\d|2[0-3]):?([0-5]\d)$' })]
         [string]$StartTime,
 
-        [ValidateScript( {$_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'})]
+        [ValidateScript( { $_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$' })]
         [string]$Duration = "00:01:00",
 
         [string]$Comment,
@@ -203,16 +204,17 @@
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         # Make Request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
@@ -243,4 +245,4 @@
 
         Return $response
     }
-} #1.0.0.7
+} #1.0.0.8

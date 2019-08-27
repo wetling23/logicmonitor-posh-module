@@ -16,6 +16,7 @@
             V1.0.0.5 date: 10 April 2019
                 - Updated filtering.
             V1.0.0.6 date: 23 August 2019
+            V1.0.0.7 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -47,19 +48,19 @@
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllAlerts')]
     Param (
-        [Parameter(Mandatory = $True)]
-        $AccessId,
+        [Parameter(Mandatory)]
+        [string]$AccessId,
 
-        [Parameter(Mandatory = $True)]
-        $AccessKey,
+        [Parameter(Mandatory)]
+        [securestring]$AccessKey,
 
-        [Parameter(Mandatory = $True)]
-        $AccountName,
+        [Parameter(Mandatory)]
+        [string]$AccountName,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'AllAlerts')]
+        [Parameter(Mandatory, ParameterSetName = 'AllAlerts')]
         [switch]$All,
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'Filter')]
+        [Parameter(Mandatory, ParameterSetName = 'Filter')]
         [hashtable]$Filter,
 
         [int]$BatchSize = 1000,
@@ -123,16 +124,17 @@
 
                     # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
+                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
                     # Construct Headers
-                    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-                    $headers.Add("Authorization", "LMv1 $AccessId`:$signature`:$epoch")
-                    $headers.Add("Content-Type", 'application/json')
-                    $headers.Add("X-Version", 2)
+                    $headers = @{
+                        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                        "Content-Type"  = "application/json"
+                        "X-Version"     = 2
+                    }
                 }
 
                 # Make Request
@@ -244,16 +246,17 @@
 
                     # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes($AccessKey)
+                    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
                     # Construct Headers
-                    $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-                    $headers.Add("Authorization", "LMv1 $AccessId`:$signature`:$epoch")
-                    $headers.Add("Content-Type", 'application/json')
-                    $headers.Add("X-Version", 2)
+                    $headers = @{
+                        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                        "Content-Type"  = "application/json"
+                        "X-Version"     = 2
+                    }
                 }
 
                 # Make Request

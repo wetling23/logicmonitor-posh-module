@@ -7,6 +7,7 @@ Function Update-LogicMonitorAlertRule {
             V1.0.0.0 date: 8 May 2019
                 - Initial release.
             V1.0.0.1 date: 23 August 2019
+            V1.0.0.2 date: 26 August 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -55,7 +56,7 @@ Function Update-LogicMonitorAlertRule {
         [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [string]$AccessKey,
+        [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         [string]$AccountName,
@@ -147,16 +148,17 @@ Function Update-LogicMonitorAlertRule {
 
         # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
-        $hmac.Key = [Text.Encoding]::UTF8.GetBytes($accessKey)
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-        $headers.Add("Content-Type", 'application/json')
-        $headers.Add("X-Version", 2)
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
 
         Do {
             Try {
@@ -189,4 +191,4 @@ Function Update-LogicMonitorAlertRule {
 
         $response
     }
-} #1.0.0.1
+} #1.0.0.2
