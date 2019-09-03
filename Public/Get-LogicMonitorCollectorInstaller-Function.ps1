@@ -41,6 +41,7 @@
             V1.0.0.14 date: 15 August 2019
             V1.0.0.15 date: 23 August 2019
             V1.0.0.16 date: 26 August 2019
+            V1.0.0.17 date: 3 September 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -204,11 +205,9 @@
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
     # Create the web client object and add headers
-    $headers = @{
-        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
-        "Content-Type"  = "application/json"
-        "X-Version"     = 2
-    }
+    $webClient = New-Object System.Net.WebClient
+    $webClient.Headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
+    $webClient.Headers.Add("Content-Type", 'application/json')
 
     # Make Request
     Switch ($Async) {
