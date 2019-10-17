@@ -21,6 +21,7 @@
             V1.0.0.7 date: 27 March 2019
                 - Removed timezone parameter after discussion with LogicMonitor.
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 17 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -234,8 +235,9 @@
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error starting SDT. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error starting SDT. To prevent errors, {1} will exit. If present, the error detail is: {2} PowerShell returned: {3}" -f `
+                            [datetime]::Now, $MyInvocation.MyCommand, (($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errors).detail), $_.Exception.Message)
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return $response
                 }
@@ -245,4 +247,4 @@
 
         Return $response
     }
-} #1.0.0.8
+} #1.0.0.9
