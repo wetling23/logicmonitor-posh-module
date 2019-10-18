@@ -238,10 +238,10 @@
                 }
                 Else {
                     $message = ("{0}: Unexpected error starting SDT. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                        Error message: {2}`r`n
-                        Error code: {3}`r`n
-                        Invoke-Request: {4}`r`n
-                        Headers: {5}`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
                         Body: {6}" -f
                         [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                         ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
