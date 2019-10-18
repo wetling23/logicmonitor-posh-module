@@ -23,6 +23,7 @@
             V1.0.0.8 date: 26 August 2019
             V1.0.0.9 date: 17 October 2019
             V1.0.0.10 date: 18 October 2019
+            V1.0.0.11 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -255,4 +256,4 @@
 
         Return $response
     }
-} #1.0.0.10
+} #1.0.0.11

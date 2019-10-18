@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.1.17'
+    ModuleVersion     = '1.0.1.16'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -107,7 +107,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Unified rate-limiting detection across the module. Unified error output across the module (with more detail).'
+            ReleaseNotes = 'Updated Start-LogicMonitorDeviceSdt to 1.0.0.10 (adding error details to output).'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''

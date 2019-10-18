@@ -19,6 +19,7 @@
                 - Added support for rate-limited re-try.
             V1.0.0.5 date: 23 August 2019
             V1.0.0.6 date: 26 August 2019
+            V1.0.0.7 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -118,7 +119,7 @@
 
         # Update $resourcePath to filter for a specific SDT entry, when a SDT ID is provided by the user.
         Switch ($PsCmdlet.ParameterSetName) {
-            {$_ -eq "Id"} {
+            { $_ -eq "Id" } {
                 $resourcePath += "/$Id"
 
                 $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
@@ -128,7 +129,7 @@
 
         # Build the filter, if any of the following conditions are met.
         Switch ($IsEffective, $SdtType) {
-            {$_.IsPresent} {
+            { $_.IsPresent } {
                 $filter += "isEffective:`"True`","
 
                 $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -136,7 +137,7 @@
 
                 Continue
             }
-            {$_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT'} {
+            { $_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT' } {
                 $filter += "type:`"$sdtType`","
 
                 $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -160,7 +161,7 @@
         # Determine how many times "GET" must be run, to return all SDT entries, then loop through "GET" that many times.
         While ($currentBatchNum -lt $sdtBatchCount) {
             Switch ($PsCmdlet.ParameterSetName) {
-                {$_ -in ("Id", "AllSdt")} {
+                { $_ -in ("Id", "AllSdt") } {
                     If ([string]::IsNullOrEmpty($filter)) {
                         $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
                     }
@@ -230,8 +231,16 @@
                         Start-Sleep -Seconds 60
                     }
                     Else {
-                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                            [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                            ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        )
+                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                         Return "Error"
                     }
@@ -240,7 +249,7 @@
             While ($stopLoop -eq $false)
 
             Switch ($PsCmdlet.ParameterSetName) {
-                {$_ -in ("AllSdt", "AdminName")} {
+                { $_ -in ("AllSdt", "AdminName") } {
                     $message = ("{0}: Entering switch statement for all-SDT retrieval." -f [datetime]::Now)
                     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -289,4 +298,4 @@
 
         Return $sdts
     }
-} #1.0.0.6
+} #1.0.0.7

@@ -22,6 +22,7 @@
             V1.0.1.0 date: 14 August 2019
             V1.0.1.1 date: 23 August 2019
             V1.0.1.2 date: 26 August 2019
+            V1.0.1.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -156,12 +157,22 @@
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+            Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $Properties.Name, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -170,4 +181,4 @@
 
     $response
 }
-#1.0.1.2
+#1.0.1.3

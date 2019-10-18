@@ -12,6 +12,7 @@
                 - Updated to use API v2 and changed input parameters.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -113,7 +114,7 @@
 
     # Get current time in milliseconds
     $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-y
+    y
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
 
@@ -139,11 +140,27 @@ y
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. To prevent errors, the {1} function will exit. The specific error is: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error updating LogicMonitor website property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     Return $response
-} #1.0.0.4
+} #1.0.0.5

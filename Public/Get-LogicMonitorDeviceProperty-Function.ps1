@@ -25,6 +25,7 @@
                 - Updated alias publishing method.
             V1.0.0.8 date: 23 August 2019
             V1.0.0.9 date: 26 August 2019
+            V1.0.0.10 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -178,13 +179,27 @@
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
-    $devices = $response.items
-
-    Return $devices
-} #1.0.0.9
+    Return $response.items
+} #1.0.0.10

@@ -43,6 +43,7 @@
             V1.0.0.16 date: 26 August 2019
             V1.0.0.17 date: 3 September 2019
             V1.0.0.18 date: 3 September 2019
+            V1.0.0.19 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -153,8 +154,15 @@
                 $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Hostname $Hostname
             }
             Catch {
-                $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, {1} will exit. The specific error is: {2}" -f `
-                        [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
                 If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
@@ -248,4 +256,4 @@
             }
         }
     }
-} #1.0.0.18
+} #1.0.0.19

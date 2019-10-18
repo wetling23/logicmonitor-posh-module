@@ -7,6 +7,7 @@ Function Update-LogicMonitorDashboard {
             V1.0.0.0 date: 22 May 2019
                 - Initial release.
             V1.0.0.1 date: 26 August 2019
+            V1.0.0.2 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -146,17 +147,27 @@ Function Update-LogicMonitorDashboard {
 
                     Start-Sleep -Seconds 60
                 }
-                ElseIf ($_.Exception.Message -eq 'The remote server returned an error: (400) Bad Request.') {
-                    $message = ("{0}: Error updating the alert rule. The specific message is: {1}" -f [datetime]::Now, $_.ErrorDetails.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
-
-                    Return "Error"
-                }
                 Else {
-                    $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    If ($_.Exception.Message -match '429') {
+                        $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                        If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-                    Return "Error"
+                        Start-Sleep -Seconds 60
+                    }
+                    Else {
+                        $message = ("{0}: Unexpected error updating LogicMonitor dashboard. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                            [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                            ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        )
+                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                        Return "Error"
+                    }
                 }
             }
         }
@@ -164,4 +175,4 @@ Function Update-LogicMonitorDashboard {
 
         $response
     }
-} #1.0.0.1
+} #1.0.0.2

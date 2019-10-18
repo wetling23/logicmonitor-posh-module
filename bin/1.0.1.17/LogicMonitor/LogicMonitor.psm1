@@ -98,6 +98,7 @@ Function Add-LogicMonitorCollector {
                 - Updated whitespace.
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -181,13 +182,13 @@ Function Add-LogicMonitorCollector {
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
+    # Construct headers.
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
     }
 
-    # Make Request
+    # Make request.
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -195,11 +196,26 @@ Function Add-LogicMonitorCollector {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the Add-LogicMonitorCollector function will exit. The specific error was: {1}" `
-                -f [datetime]::Now, $_Exception.Message)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error adding LogicMonitor collector. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     Switch ($response.status) {
@@ -236,14 +252,21 @@ Function Add-LogicMonitorCollector {
             If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
         }
         Else {
-            $message = ("{0}: Unexpected error recording {1} to the registry. No big deal, the function will continue. The specific error is: {2}" `
-                    -f [datetime]::Now, $response.data.id, $_.Exception.Message)
+            $message = ("{0}: Unexpected error recording {1} to the registry. To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $response.data.id, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
         }
     }
 
     Return $response.data.id
-} #1.0.0.8
+} #1.0.0.9
 Function Add-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -285,6 +308,7 @@ Function Add-LogicMonitorDevice {
             V1.0.1.0 date: 15 August 2019
             V1.0.1.1 date: 23 August 2019
             V1.0.1.2 date: 26 August 2019
+            V1.0.1.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -436,12 +460,22 @@ Function Add-LogicMonitorDevice {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+            Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding device called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $Properties.Name, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -449,7 +483,7 @@ Function Add-LogicMonitorDevice {
     }
 
     $response
-} #1.0.1.2
+} #1.0.1.3
 Function Add-LogicMonitorDeviceGroup {
     <#
         .DESCRIPTION
@@ -474,6 +508,7 @@ Function Add-LogicMonitorDeviceGroup {
             V1.0.1.0 date: 14 August 2019
             V1.0.1.1 date: 23 August 2019
             V1.0.1.2 date: 26 August 2019
+            V1.0.1.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -608,12 +643,22 @@ Function Add-LogicMonitorDeviceGroup {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+            Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $Properties.Name, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -622,8 +667,8 @@ Function Add-LogicMonitorDeviceGroup {
 
     $response
 }
-#1.0.1.2
-Function Get-LogicMonitorAlert {
+#1.0.1.3
+Function Get-LogicMonitorAlert2 {
     <#
         .DESCRIPTION
             Retrieves Alert objects from LogicMonitor.
@@ -642,6 +687,7 @@ Function Get-LogicMonitorAlert {
                 - Updated filtering.
             V1.0.0.6 date: 23 August 2019
             V1.0.0.7 date: 26 August 2019
+            V1.0.0.8 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -780,8 +826,16 @@ Function Get-LogicMonitorAlert {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -902,8 +956,16 @@ Function Get-LogicMonitorAlert {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -921,7 +983,7 @@ Function Get-LogicMonitorAlert {
             Return $alerts
         }
     }
-} #1.0.0.7
+} #1.0.0.8
 Function Get-LogicMonitorAlertRule {
     <#
         .DESCRIPTION
@@ -940,6 +1002,7 @@ Function Get-LogicMonitorAlertRule {
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1091,8 +1154,16 @@ Function Get-LogicMonitorAlertRule {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting alert rules. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting alert rules. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -1172,7 +1243,7 @@ Function Get-LogicMonitorAlertRule {
     }
 
     Return $alertRules
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorAuditLog {
     <#
         .DESCRIPTION
@@ -1199,6 +1270,7 @@ Function Get-LogicMonitorAuditLog {
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1352,8 +1424,16 @@ Function Get-LogicMonitorAuditLog {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting audit log entries. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting audit log entries. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -1387,7 +1467,7 @@ Function Get-LogicMonitorAuditLog {
     }
 
     Return $logEntries
-} #1.0.0.8
+} #1.0.0.9
 Function Get-LogicMonitorCollector {
     <#
         .DESCRIPTION
@@ -1430,6 +1510,7 @@ Function Get-LogicMonitorCollector {
                 - Fixed bug in collector retrieval by name/description.
             V1.0.0.15 date: 23 August 2019
             V1.0.0.16 date: 26 August 2019
+            V1.0.0.17 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1607,8 +1688,16 @@ Function Get-LogicMonitorCollector {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting collectors. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting collectors. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -1696,7 +1785,7 @@ Function Get-LogicMonitorCollector {
     }
 
     Return $devices
-} #1.0.0.16
+} #1.0.0.17
 Function Get-LogicMonitorCollectorAvailableVersion {
     <#
         .DESCRIPTION
@@ -1713,6 +1802,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1820,8 +1910,16 @@ Function Get-LogicMonitorCollectorAvailableVersion {
                 Start-Sleep -Seconds 60
             }
             Else {
-                $message = ("{0}: Unexpected error getting available versions. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                $message = ("{0}: Unexpected error getting available versions. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
@@ -1830,7 +1928,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorCollectorInstaller {
     <#
         .DESCRIPTION
@@ -1876,6 +1974,7 @@ Function Get-LogicMonitorCollectorInstaller {
             V1.0.0.16 date: 26 August 2019
             V1.0.0.17 date: 3 September 2019
             V1.0.0.18 date: 3 September 2019
+            V1.0.0.19 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1986,8 +2085,15 @@ Function Get-LogicMonitorCollectorInstaller {
                 $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Hostname $Hostname
             }
             Catch {
-                $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, {1} will exit. The specific error is: {2}" -f `
-                        [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
                 If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
@@ -2081,7 +2187,7 @@ Function Get-LogicMonitorCollectorInstaller {
             }
         }
     }
-} #1.0.0.18
+} #1.0.0.19
 Function Get-LogicMonitorCollectorUpgradeHistory {
     <#
         .DESCRIPTION
@@ -2099,6 +2205,7 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
                 - Added support for rate-limited re-try.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2212,8 +2319,16 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting upgrade histories. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting upgrade histories. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -2252,7 +2367,7 @@ Function Get-LogicMonitorCollectorUpgradeHistory {
     }
 
     Return $histories
-} #1.0.0.5
+} #1.0.0.6
 Function Get-LogicMonitorConfigSource {
     <#
         .DESCRIPTION
@@ -2268,6 +2383,7 @@ Function Get-LogicMonitorConfigSource {
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2481,8 +2597,16 @@ Function Get-LogicMonitorConfigSource {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting ConfigSource(s). To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting ConfigSource(s). To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -2533,7 +2657,7 @@ Function Get-LogicMonitorConfigSource {
 
                 Return $configSources
             }
-            {$_ -in ("NameFilter", "AppliesToFilter")} {
+            { $_ -in ("NameFilter", "AppliesToFilter") } {
                 $message = ("{0}: Entering switch statement for filtered-ConfigSource retrieval." -f [datetime]::Now)
                 If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -2575,7 +2699,7 @@ Function Get-LogicMonitorConfigSource {
     }
 
     Return $configSources
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorDashboard {
     <#
         .DESCRIPTION
@@ -2585,6 +2709,7 @@ Function Get-LogicMonitorDashboard {
             V1.0.0.0 date: 22 May 2019
             V1.0.0.1 date: 23 August 2019
             V1.0.0.2 date: 26 August 2019
+            V1.0.0.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2755,8 +2880,16 @@ Function Get-LogicMonitorDashboard {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -2804,8 +2937,16 @@ Function Get-LogicMonitorDashboard {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -2845,8 +2986,16 @@ Function Get-LogicMonitorDashboard {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -2866,7 +3015,7 @@ Function Get-LogicMonitorDashboard {
     Until (($null -eq $response) -or ($singleDashCheckDone))
 
     $dashboards
-} #1.0.0.2
+} #1.0.0.3
 Function Get-LogicMonitorDashboardWidget {
     <#
         .DESCRIPTION
@@ -2874,6 +3023,7 @@ Function Get-LogicMonitorDashboardWidget {
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 26 August 2019
+            V1.0.0.1 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3022,12 +3172,22 @@ Function Get-LogicMonitorDashboardWidget {
         $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+            Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding device called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding device called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $Properties.Name, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
         }
 
@@ -3035,7 +3195,7 @@ Function Get-LogicMonitorDashboardWidget {
     }
 
     $response
-} #1.0.0.0
+} #1.0.0.1
 Function Get-LogicMonitorDataSource {
     <#
         .DESCRIPTION
@@ -3071,6 +3231,7 @@ Function Get-LogicMonitorDataSource {
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
             V1.0.0.13 date: 26 August 2019
+            V1.0.0.14 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3302,8 +3463,16 @@ Function Get-LogicMonitorDataSource {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting DataSources. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting DataSources. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -3413,7 +3582,7 @@ Function Get-LogicMonitorDataSource {
     }
 
     Return $dataSources
-} #1.0.0.13
+} #1.0.0.14
 Function Get-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -3464,6 +3633,7 @@ Function Get-LogicMonitorDevice {
                 - Updated date calculation.
             V1.0.0.17 date: 23 August 2019
             V1.0.0.18 date: 26 August 2019
+            V1.0.0.19 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3656,8 +3826,16 @@ Function Get-LogicMonitorDevice {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -3705,8 +3883,16 @@ Function Get-LogicMonitorDevice {
                             Start-Sleep -Seconds 60
                         }
                         Else {
-                            $message = ("{0}: Unexpected error getting device. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                            $message = ("{0}: Unexpected error getting device. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                                Error message: {2}`r
+                                Error code: {3}`r
+                                Invoke-Request: {4}`r
+                                Headers: {5}`r
+                                Body: {6}" -f
+                                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                            )
+                            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                             Return "Error"
                         }
@@ -3724,7 +3910,7 @@ Function Get-LogicMonitorDevice {
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.18
+} #1.0.0.19
 Function Get-LogicMonitorDeviceDataSource {
     <#
         .DESCRIPTION
@@ -3740,6 +3926,7 @@ Function Get-LogicMonitorDeviceDataSource {
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -3861,8 +4048,16 @@ Function Get-LogicMonitorDeviceDataSource {
                 Start-Sleep -Seconds 60
             }
             Else {
-                $message = ("{0}: Unexpected error getting device DataSources. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                $message = ("{0}: Unexpected error getting device DataSources. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
@@ -3871,7 +4066,7 @@ Function Get-LogicMonitorDeviceDataSource {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorDeviceGroup {
     <#
         .DESCRIPTION
@@ -3909,6 +4104,7 @@ Function Get-LogicMonitorDeviceGroup {
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
             V1.0.0.13 date: 26 August 2019
+            V1.0.0.14 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4070,8 +4266,16 @@ Function Get-LogicMonitorDeviceGroup {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting device groups. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting device groups. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -4155,7 +4359,7 @@ Function Get-LogicMonitorDeviceGroup {
     }
 
     Return $retrievedGroups
-} #1.0.0.13
+} #1.0.0.14
 Function Get-LogicMonitorDeviceGroupProperty {
     <#
         .DESCRIPTION
@@ -4175,6 +4379,7 @@ Function Get-LogicMonitorDeviceGroupProperty {
                 - Updated alias publishing method.
             V1.0.0.5 date: 23 August 2019
             V1.0.0.6 date: 26 August 2019
+            V1.0.0.7 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4284,14 +4489,14 @@ Function Get-LogicMonitorDeviceGroupProperty {
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
+    # Construct headers
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
         "X-Version"     = 2
     }
 
-    # Make Request
+    # Make request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -4299,15 +4504,30 @@ Function Get-LogicMonitorDeviceGroupProperty {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, {1} will exit. The specific error message is: {2}" `
-                -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error getting device group property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     Return $response.items
-} #1.0.0.6
+} #1.0.0.7
 Function Get-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -4335,6 +4555,7 @@ Function Get-LogicMonitorDeviceProperty {
                 - Updated alias publishing method.
             V1.0.0.8 date: 23 August 2019
             V1.0.0.9 date: 26 August 2019
+            V1.0.0.10 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4488,16 +4709,30 @@ Function Get-LogicMonitorDeviceProperty {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error getting device properties. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
-    $devices = $response.items
-
-    Return $devices
-} #1.0.0.9
+    Return $response.items
+} #1.0.0.10
 Function Get-LogicMonitorDeviceSdt {
     <#
         .DESCRIPTION 
@@ -4517,6 +4752,7 @@ Function Get-LogicMonitorDeviceSdt {
                 - Added support for rate-limited re-try.
             V1.0.0.5 date: 23 August 2019
             V1.0.0.6 date: 26 August 2019
+            V1.0.0.7 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4651,8 +4887,16 @@ Function Get-LogicMonitorDeviceSdt {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting device SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting device SDTs. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -4662,7 +4906,7 @@ Function Get-LogicMonitorDeviceSdt {
 
         Return $response.items
     }
-} #1.0.0.6
+} #1.0.0.7
 Function Get-LogicMonitorPropertySource {
     <#
         .DESCRIPTION 
@@ -4678,6 +4922,7 @@ Function Get-LogicMonitorPropertySource {
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -4877,8 +5122,16 @@ Function Get-LogicMonitorPropertySource {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting PropertySources. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting PropertySources. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -4971,7 +5224,7 @@ Function Get-LogicMonitorPropertySource {
     }
 
     Return $propertySources
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorRole {
     <#
         .DESCRIPTION
@@ -4986,6 +5239,7 @@ Function Get-LogicMonitorRole {
                 - Updated alias publishing method.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5101,8 +5355,16 @@ Function Get-LogicMonitorRole {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting roles. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting roles. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -5141,7 +5403,7 @@ Function Get-LogicMonitorRole {
     }
 
     Return $roles
-} #1.0.0.4
+} #1.0.0.5
 Function Get-LogicMonitorSdt {
     <#
         .DESCRIPTION
@@ -5163,6 +5425,7 @@ Function Get-LogicMonitorSdt {
                 - Added support for rate-limited re-try.
             V1.0.0.5 date: 23 August 2019
             V1.0.0.6 date: 26 August 2019
+            V1.0.0.7 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5262,7 +5525,7 @@ Function Get-LogicMonitorSdt {
 
         # Update $resourcePath to filter for a specific SDT entry, when a SDT ID is provided by the user.
         Switch ($PsCmdlet.ParameterSetName) {
-            {$_ -eq "Id"} {
+            { $_ -eq "Id" } {
                 $resourcePath += "/$Id"
 
                 $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
@@ -5272,7 +5535,7 @@ Function Get-LogicMonitorSdt {
 
         # Build the filter, if any of the following conditions are met.
         Switch ($IsEffective, $SdtType) {
-            {$_.IsPresent} {
+            { $_.IsPresent } {
                 $filter += "isEffective:`"True`","
 
                 $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -5280,7 +5543,7 @@ Function Get-LogicMonitorSdt {
 
                 Continue
             }
-            {$_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT'} {
+            { $_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT' } {
                 $filter += "type:`"$sdtType`","
 
                 $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f [datetime]::Now, $($PsCmdlet.ParameterSetName), $queryParams)
@@ -5304,7 +5567,7 @@ Function Get-LogicMonitorSdt {
         # Determine how many times "GET" must be run, to return all SDT entries, then loop through "GET" that many times.
         While ($currentBatchNum -lt $sdtBatchCount) {
             Switch ($PsCmdlet.ParameterSetName) {
-                {$_ -in ("Id", "AllSdt")} {
+                { $_ -in ("Id", "AllSdt") } {
                     If ([string]::IsNullOrEmpty($filter)) {
                         $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
                     }
@@ -5374,8 +5637,16 @@ Function Get-LogicMonitorSdt {
                         Start-Sleep -Seconds 60
                     }
                     Else {
-                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                            [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                            ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        )
+                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                         Return "Error"
                     }
@@ -5384,7 +5655,7 @@ Function Get-LogicMonitorSdt {
             While ($stopLoop -eq $false)
 
             Switch ($PsCmdlet.ParameterSetName) {
-                {$_ -in ("AllSdt", "AdminName")} {
+                { $_ -in ("AllSdt", "AdminName") } {
                     $message = ("{0}: Entering switch statement for all-SDT retrieval." -f [datetime]::Now)
                     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -5433,7 +5704,7 @@ Function Get-LogicMonitorSdt {
 
         Return $sdts
     }
-} #1.0.0.6
+} #1.0.0.7
 Function Get-LogicMonitorServiceProperty {
     <#
         .DESCRIPTION
@@ -5460,6 +5731,7 @@ Function Get-LogicMonitorServiceProperty {
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5608,8 +5880,16 @@ Function Get-LogicMonitorServiceProperty {
                 Start-Sleep -Seconds 60
             }
             Else {
-                $message = ("{0}: Unexpected error getting service properties. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                $message = ("{0}: Unexpected error getting service properties. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                 Return "Error"
             }
@@ -5618,7 +5898,7 @@ Function Get-LogicMonitorServiceProperty {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.8
+} #1.0.0.9
 Function Get-LogicMonitorWebsite {
     <#
         .DESCRIPTION
@@ -5656,6 +5936,7 @@ Function Get-LogicMonitorWebsite {
                 - Updated alias publishing method.
             V1.0.0.12 date: 23 August 2019
             V1.0.0.13 date: 26 August 2019
+            V1.0.0.14 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5817,8 +6098,16 @@ Function Get-LogicMonitorWebsite {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting websites. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting websites. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -5902,7 +6191,7 @@ Function Get-LogicMonitorWebsite {
 
         Return $websites
     }
-} #1.0.0.13
+} #1.0.0.14
 Function Remove-LogicMonitorCollector {
     <#
         .DESCRIPTION
@@ -5923,6 +6212,7 @@ Function Remove-LogicMonitorCollector {
                 - Updated whitespace.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6007,14 +6297,14 @@ Function Remove-LogicMonitorCollector {
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
+    # Construct headers
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
         "X-Version"     = 2
     }
 
-    # Make Request
+    # Make request
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -6022,16 +6312,31 @@ Function Remove-LogicMonitorCollector {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error removing LogicMonitor collector. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     # A blank response is normal, for a successful operation.
     Return $response
-} #1.0.0.5
+} #1.0.0.6
 Function Remove-LogicMonitorCollectorVersion {
     <#
         .DESCRIPTION
@@ -6046,6 +6351,7 @@ Function Remove-LogicMonitorCollectorVersion {
                 - Added support for rate-limited re-try.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6212,8 +6518,16 @@ Function Remove-LogicMonitorCollectorVersion {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error scheduling a downgrade. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error scheduling a downgrade. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error", $response
                 }
@@ -6223,7 +6537,7 @@ Function Remove-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.4
+} #1.0.0.5
 Function Remove-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -6247,6 +6561,7 @@ Function Remove-LogicMonitorDevice {
             V1.0.0.6 date: 15 April 2019
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6424,20 +6739,30 @@ Function Remove-LogicMonitorDevice {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
     }
     Catch {
-        If ($_.ErrorDetails.message | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue) {
-            $message = ("{0}: The request failed and the error message is: `"{1}`". The error code is: {2}." -f [datetime]::Now, ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue), ($_.ErrorDetails.message | ConvertFrom-Json | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue))
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+
+            Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". The specific error is: {2}" -f [datetime]::Now, $Properties.Name, $_.Exception.Message)
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+            Error message: {3}`r
+            Error code: {4}`r
+            Invoke-Request: {5}`r
+            Headers: {6}`r
+            Body: {7}" -f
+                [datetime]::Now, $Properties.Name, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
-        }
 
-        Return "Error"
+            Return "Error"
+        }
     }
 
     Return $response
-} #1.0.0.8
+} #1.0.0.9
 Function Remove-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -6465,6 +6790,7 @@ Function Remove-LogicMonitorDeviceProperty {
                 - Updated alias publishing method.
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6643,13 +6969,13 @@ Function Remove-LogicMonitorDeviceProperty {
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-        # Construct Headers
+        # Construct headers
         $headers = @{
             "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
         }
 
-        # Make Request
+        # Make request
         $message = ("{0}: Executing the REST query." -f [datetime]::Now)
         If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -6657,11 +6983,26 @@ Function Remove-LogicMonitorDeviceProperty {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
         }
         Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message)
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+            If ($_.Exception.Message -match '429') {
+                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-            Return "Error"
+                Start-Sleep -Seconds 60
+            }
+            Else {
+                $message = ("{0}: Unexpected error removing LogicMonitor device property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                Return "Error"
+            }
         }
 
         If ($response.status -ne "200") {
@@ -6673,7 +7014,7 @@ Function Remove-LogicMonitorDeviceProperty {
     }
 
     Return "Success"
-} #1.0.0.8
+} #1.0.0.9
 Function Remove-LogicMonitorSdt {
     <#
         .DESCRIPTION
@@ -6684,6 +7025,7 @@ Function Remove-LogicMonitorSdt {
                 - Initial release.
             V1.0.0.1 date: 23 August 2019
             V1.0.0.2 date: 26 August 2019
+            V1.0.0.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6800,8 +7142,16 @@ Function Remove-LogicMonitorSdt {
                     Start-Sleep -Seconds 60
                 }
                 Else {
-                    $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: Unexpected error getting SDT. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
                 }
@@ -6811,7 +7161,7 @@ Function Remove-LogicMonitorSdt {
 
         Return $response
     }
-} #1.0.0.2
+} #1.0.0.3
 Function Start-LogicMonitorDeviceSdt {
     <#
         .DESCRIPTION
@@ -6837,6 +7187,7 @@ Function Start-LogicMonitorDeviceSdt {
             V1.0.0.8 date: 26 August 2019
             V1.0.0.9 date: 17 October 2019
             V1.0.0.10 date: 18 October 2019
+            V1.0.0.11 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7069,7 +7420,7 @@ Function Start-LogicMonitorDeviceSdt {
 
         Return $response
     }
-} #1.0.0.10
+} #1.0.0.11
 # Need to figure out, in what format(s) I can have the user provide start and end dates. Using '06/07/2017' (for example) works, but throws an error.
 # The ElseIf for "Start date is provided. Start time is not provided." complains, but I'm not sure why. The lines work when called outside the function.
 Function Start-LogicMonitorSDT {
@@ -7088,6 +7439,7 @@ Function Start-LogicMonitorSDT {
         - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
         - Replaced ! with -NOT.
     V1.0.0.3 date: 23 August 2019
+    V1.0.0.4 date: 18 October 2019
 .LINK
     https://github.com/wetling23/logicmonitor-posh-module
 .PARAMETER AccessId
@@ -7217,10 +7569,10 @@ Function Start-LogicMonitorSDT {
         $endDate = $StartDate.AddDays($duration[0])
         $endDate = $endDate.AddHours($duration[1])
         $endDate = $endDate.AddMinutes($duration[2])
-    
+
         $sdtStart = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($StartDate).ToUniversalTime()).TotalMilliseconds)
         $sdtEnd = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($endDate).ToUniversalTime()).TotalMilliseconds)
-		
+
         While (($Id -eq $null) -and ($DisplayName -eq $null)) {
             $input = Read-Host = "Enter the target device's ID or display name"
 
@@ -7268,14 +7620,31 @@ Function Start-LogicMonitorSDT {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
         }
         Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+            If ($_.Exception.Message -match '429') {
+                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-            Return "Error"
+                Start-Sleep -Seconds 60
+            }
+            Else {
+                $message = ("{0}: Unexpected error starting SDT. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                Return "Error"
+            }
         }
+
+        $response
     }
-} #1.0.0.3
+} #1.0.0.4
 Function Update-LogicMonitorAlertRule {
     <#
         .DESCRIPTION
@@ -7286,6 +7655,7 @@ Function Update-LogicMonitorAlertRule {
                 - Initial release.
             V1.0.0.1 date: 23 August 2019
             V1.0.0.2 date: 26 August 2019
+            V1.0.0.3 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7451,14 +7821,16 @@ Function Update-LogicMonitorAlertRule {
 
                     Start-Sleep -Seconds 60
                 }
-                ElseIf ($_.Exception.Message -eq 'The remote server returned an error: (400) Bad Request.') {
-                    $message = ("{0}: Error updating the alert rule. The specific message is: {1}" -f [datetime]::Now, $_.ErrorDetails.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
-
-                    Return "Error"
-                }
                 Else {
-                    $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                    $message = ("{0}: Unexpected error getting device. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
                     If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
 
                     Return "Error"
@@ -7469,7 +7841,7 @@ Function Update-LogicMonitorAlertRule {
 
         $response
     }
-} #1.0.0.2
+} #1.0.0.3
 Function Update-LogicMonitorAlertRuleProperty {
     <#
         .DESCRIPTION
@@ -7487,6 +7859,7 @@ Function Update-LogicMonitorAlertRuleProperty {
                 - This command is deprecated, in favor of Update-LogicMonitorAlertRule.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7650,11 +8023,26 @@ Function Update-LogicMonitorAlertRuleProperty {
                 $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
             }
             Catch {
-                $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                        -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-                Return "Error", $response
+                    Start-Sleep -Seconds 60
+                }
+                Else {
+                    $message = ("{0}: Unexpected error updating alert rule property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                    Return "Error", $response
+                }
             }
 
             If ($response.status -ne "200") {
@@ -7665,7 +8053,7 @@ Function Update-LogicMonitorAlertRuleProperty {
             Return $response
         }
     }
-} #1.0.0.5
+} #1.0.0.6
 Function Update-LogicMonitorCollectorProperty {
     <#
         .DESCRIPTION
@@ -7683,6 +8071,7 @@ Function Update-LogicMonitorCollectorProperty {
                 - Updated alias publishing method.
             V1.0.0.4 date: 23 August 2019
             V1.0.0.5 date: 26 August 2019
+            V1.0.0.6 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -7845,11 +8234,26 @@ Function Update-LogicMonitorCollectorProperty {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error", $response
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error updating LogicMonitor collector property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error", $response
+        }
     }
 
     If ($response.status -ne "200") {
@@ -7858,7 +8262,7 @@ Function Update-LogicMonitorCollectorProperty {
     }
 
     Return $response
-} #1.0.0.5
+} #1.0.0.6
 Function Update-LogicMonitorCollectorVersion {
     <#
         .DESCRIPTION
@@ -7872,6 +8276,7 @@ Function Update-LogicMonitorCollectorVersion {
                 - Removed $StartTime. We still support the idea, just with different syntax. See examples.
             V1.0.0.2 date: 23 August 2019
             V1.0.0.3 date: 26 August 2019
+            V1.0.0.4 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8042,11 +8447,26 @@ Function Update-LogicMonitorCollectorVersion {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
         }
         Catch {
-            $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                    -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+            If ($_.Exception.Message -match '429') {
+                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-            Return "Error", $response
+                Start-Sleep -Seconds 60
+            }
+            Else {
+                $message = ("{0}: Unexpected error updating LogicMonitor collector version. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                )
+                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                Return "Error", $response
+            }
         }
 
         If ($response.status -ne "1") {
@@ -8056,7 +8476,7 @@ Function Update-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.3
+} #1.0.0.4
 Function Update-LogicMonitorDashboard {
     <#
         .DESCRIPTION
@@ -8066,6 +8486,7 @@ Function Update-LogicMonitorDashboard {
             V1.0.0.0 date: 22 May 2019
                 - Initial release.
             V1.0.0.1 date: 26 August 2019
+            V1.0.0.2 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8205,17 +8626,27 @@ Function Update-LogicMonitorDashboard {
 
                     Start-Sleep -Seconds 60
                 }
-                ElseIf ($_.Exception.Message -eq 'The remote server returned an error: (400) Bad Request.') {
-                    $message = ("{0}: Error updating the alert rule. The specific message is: {1}" -f [datetime]::Now, $_.ErrorDetails.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
-
-                    Return "Error"
-                }
                 Else {
-                    $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. PowerShell returned: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    If ($_.Exception.Message -match '429') {
+                        $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+                        If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-                    Return "Error"
+                        Start-Sleep -Seconds 60
+                    }
+                    Else {
+                        $message = ("{0}: Unexpected error updating LogicMonitor dashboard. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                            [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                            ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        )
+                        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+                        Return "Error"
+                    }
                 }
             }
         }
@@ -8223,7 +8654,7 @@ Function Update-LogicMonitorDashboard {
 
         $response
     }
-} #1.0.0.1
+} #1.0.0.2
 Function Update-LogicMonitorDeviceProperty {
     <#
         .DESCRIPTION
@@ -8267,6 +8698,7 @@ Function Update-LogicMonitorDeviceProperty {
                 - Updated alias publishing method.
             V1.0.0.15 date: 23 August 2019
             V1.0.0.16 date: 26 August 2019
+            V1.0.0.17 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8503,11 +8935,26 @@ Function Update-LogicMonitorDeviceProperty {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the {1} function will exit. The specific error message is: {2}" `
-                -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error", $response
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error updating LogicMonitor device property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error", $response
+        }
     }
 
     If ($response.status -ne "200") {
@@ -8516,7 +8963,7 @@ Function Update-LogicMonitorDeviceProperty {
     }
 
     Return $response
-} #1.0.0.16
+} #1.0.0.17
 Function Update-LogicMonitorWebsiteProperty {
     <#
         .DESCRIPTION
@@ -8531,6 +8978,7 @@ Function Update-LogicMonitorWebsiteProperty {
                 - Updated to use API v2 and changed input parameters.
             V1.0.0.3 date: 23 August 2019
             V1.0.0.4 date: 26 August 2019
+            V1.0.0.5 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -8632,7 +9080,7 @@ Function Update-LogicMonitorWebsiteProperty {
 
     # Get current time in milliseconds
     $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-y
+    y
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
 
@@ -8658,12 +9106,28 @@ y
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. To prevent errors, the {1} function will exit. The specific error is: {2}" -f [datetime]::Now, $MyInvocation.MyCommand, $_.Message.Exception)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error updating LogicMonitor website property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            Error message: {2}`r
+            Error code: {3}`r
+            Invoke-Request: {4}`r
+            Headers: {5}`r
+            Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     Return $response
-} #1.0.0.4
+} #1.0.0.5
 Export-ModuleMember -Alias * -Function *

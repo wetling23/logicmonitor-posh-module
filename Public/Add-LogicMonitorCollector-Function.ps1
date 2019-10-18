@@ -23,6 +23,7 @@
                 - Updated whitespace.
             V1.0.0.7 date: 23 August 2019
             V1.0.0.8 date: 26 August 2019
+            V1.0.0.9 date: 18 October 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -106,13 +107,13 @@
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
+    # Construct headers.
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
     }
 
-    # Make Request
+    # Make request.
     $message = ("{0}: Executing the REST query." -f [datetime]::Now)
     If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
 
@@ -120,11 +121,26 @@
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
-        $message = ("{0}: It appears that the web request failed. Check your credentials and try again. To prevent errors, the Add-LogicMonitorCollector function will exit. The specific error was: {1}" `
-                -f [datetime]::Now, $_Exception.Message)
-        If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+        If ($_.Exception.Message -match '429') {
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
+            If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
 
-        Return "Error"
+            Start-Sleep -Seconds 60
+        }
+        Else {
+            $message = ("{0}: Unexpected error adding LogicMonitor collector. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
+            If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+
+            Return "Error"
+        }
     }
 
     Switch ($response.status) {
@@ -161,11 +177,18 @@
             If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
         }
         Else {
-            $message = ("{0}: Unexpected error recording {1} to the registry. No big deal, the function will continue. The specific error is: {2}" `
-                    -f [datetime]::Now, $response.data.id, $_.Exception.Message)
+            $message = ("{0}: Unexpected error recording {1} to the registry. To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                [datetime]::Now, $response.data.id, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+            )
             If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
         }
     }
 
     Return $response.data.id
-} #1.0.0.8
+} #1.0.0.9
