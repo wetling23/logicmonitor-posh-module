@@ -2,57 +2,58 @@
 # The ElseIf for "Start date is provided. Start time is not provided." complains, but I'm not sure why. The lines work when called outside the function.
 Function Start-LogicMonitorSDT {
     <#
-.DESCRIPTION 
-    Starts standard down time (SDT) for a device in LogicMonitor.
-.NOTES 
-    Author: Mike Hashemi
-    V1.0.0.0 date: 19 December 2016
-        - Initial release
-    V1.0.0.1 date: 3 May 2016
-        - Updated logging code.
-        - Added to the SynoptekLogicMonitor module.
-        - Added usage examples.
-    V1.0.0.2 date: 23 April 2018
-        - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
-        - Replaced ! with -NOT.
-    V1.0.0.3 date: 23 August 2019
-    V1.0.0.4 date: 18 October 2019
-.LINK
-    https://github.com/wetling23/logicmonitor-posh-module
-.PARAMETER AccessId
-    Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
-.PARAMETER AccessKey
-    Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
-.PARAMETER AccountName
-    Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
-.PARAMETER Id
-    Represents the device ID of a monitored device. Accepts pipeline input. Either this or the DisplayName is required.
-.PARAMETER DisplayName
-    Represents the device display name of a monitored device. Accepts pipeline input. Must be unique in LogicMonitor. Either this or the Id is required.
-.PARAMETER StartDate
-    Represents the SDT start date. If no value is provided, the current date is used.
-.PARAMETER StartTime
-    Represents the SDT start time. If no value is provided, the current time is used.
-.PARAMETER Duration
-    Represents the duration of SDT in the format days, hours, minutes (xxx:xx:xx). If no value is provided, the duration will be one hour.
-.PARAMETER Comment
-    Default value is "SDT initiated by Start-LogicMonitorSDT". 
-.PARAMETER EventLogSource
-    Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
-.PARAMETER BlockLogging
-    When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
-.EXAMPLE
-    PS C:\> Start-LogicMonitorSDT -AccessId $accessID -AccessKey $accessKey -AccountName $accountname -Id 1
+        .DESCRIPTION
+            Starts standard down time (SDT) for a device in LogicMonitor.
+        .NOTES
+            Author: Mike Hashemi
+            V1.0.0.0 date: 19 December 2016
+                - Initial release
+            V1.0.0.1 date: 3 May 2016
+                - Updated logging code.
+                - Added to the SynoptekLogicMonitor module.
+                - Added usage examples.
+            V1.0.0.2 date: 23 April 2018
+                - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
+                - Replaced ! with -NOT.
+            V1.0.0.3 date: 23 August 2019
+            V1.0.0.4 date: 18 October 2019
+            V1.0.0.5 date: 4 December 2019
+        .LINK
+            https://github.com/wetling23/logicmonitor-posh-module
+        .PARAMETER AccessId
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
+        .PARAMETER AccessKey
+            Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
+        .PARAMETER AccountName
+            Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
+        .PARAMETER Id
+            Represents the device ID of a monitored device. Accepts pipeline input. Either this or the DisplayName is required.
+        .PARAMETER DisplayName
+            Represents the device display name of a monitored device. Accepts pipeline input. Must be unique in LogicMonitor. Either this or the Id is required.
+        .PARAMETER StartDate
+            Represents the SDT start date. If no value is provided, the current date is used.
+        .PARAMETER StartTime
+            Represents the SDT start time. If no value is provided, the current time is used.
+        .PARAMETER Duration
+            Represents the duration of SDT in the format days, hours, minutes (xxx:xx:xx). If no value is provided, the duration will be one hour.
+        .PARAMETER Comment
+            Default value is "SDT initiated by Start-LogicMonitorSDT". 
+        .PARAMETER EventLogSource
+            When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
+        .PARAMETER LogPath
+            When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
+        .EXAMPLE
+            PS C:\> Start-LogicMonitorSDT -AccessId $accessID -AccessKey $accessKey -AccountName $accountname -Id 1 -Verbose
 
-    In this example, SDT will be started for the device with Id "1". The SDT will start immediately and will last one hour.
-.EXAMPLE 
-    PS C:\> 
-.EXAMPLE 
+            In this example, SDT will be started for the device with Id "1". The SDT will start immediately and will last one hour. Verbose output is sent to the host.
+        .EXAMPLE
+            PS C:\> 
+        .EXAMPLE
 
-.EXAMPLE 
+        .EXAMPLE
 
-.EXAMPLE 
-#>
+        .EXAMPLE
+    #>
     [CmdletBinding()]
     Param (
         [Parameter(Mandatory = $True)]
@@ -78,9 +79,9 @@ Function Start-LogicMonitorSDT {
 
         [string]$Comment = "SDT initiated by Start-LogicMonitorSDT",
 
-        [string]$EventLogSource = 'LogicMonitorPowershellModule',
+        [string]$EventLogSource,
 
-        [switch]$BlockLogging
+        [string]$LogPath
     )
 
     Begin {
@@ -94,27 +95,16 @@ Function Start-LogicMonitorSDT {
         $regex = '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'
     }
     Process {
-        If (-NOT($BlockLogging)) {
-            $return = Add-EventLogSource -EventLogSource $EventLogSource
-    
-            If ($return -ne "Success") {
-                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message;
-
-                $BlockLogging = $True
-            }
-        }
-
-        $message = ("{0}: Beginning {1}." -f [datetime]::Now, $MyInvocation.MyCommand)
-        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+        $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         While ($Duration -notmatch $regex) {
-            Write-Output ("The value for duration ({0}) is invalid. Please provide a valid SDT duration." -f $Duration)
+            $message = ("{0}: The value for duration ({1}) is invalid. Please provide a valid SDT duration." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Duration)
             $Duration = Read-Host "Please enter the end duration of SDT (days:hours:minutes (999:23:59))"
         }
 
-        $message = ("{0}: Validating start time/date." -f [datetime]::Now)
-        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+        $message = ("{0}: Validating start time/date." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         If (($StartDate -eq $null) -and ($StartTime -eq $null)) {
             # Neither start time nor end time provided.
@@ -139,8 +129,8 @@ Function Start-LogicMonitorSDT {
         # Split the duration into days, hours, and minutes.
         [array]$duration = $duration.Split(":")
 
-        $message = ("{0}: Configuring duration." -f [datetime]::Now)
-        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+        $message = ("{0}: Configuring duration." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         # Use the start date/time + duration to determine when the end date/time.
         $endDate = $StartDate.AddDays($duration[0])
@@ -157,8 +147,8 @@ Function Start-LogicMonitorSDT {
             If ($input -match "^[\d\.]+$") { $id = $input } Else { $displayName = $input }
         }
 
-        $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Device Display Name: {4}." -f [datetime]::Now, $StartDate, $endDate, $Id, $DisplayName)
-        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+        $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Device Display Name: {4}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $endDate, $Id, $DisplayName)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         If ($id) {
             $data = "{`"sdtType`":1,`"type`":`"DeviceSDT`",`"deviceId`":`"$Id`",`"startDateTime`":$sdtStart,`"endDateTime`":$sdtEnd}"
@@ -190,16 +180,16 @@ Function Start-LogicMonitorSDT {
         $headers.Add("Content-Type", 'application/json')
         
         # Make Request
-        $message = ("{0}: Executing the REST query." -f [datetime]::Now)
-        If ($BlockLogging) { Write-Host $message -ForegroundColor White } Else { Write-Host $message -ForegroundColor White; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Information -Message $message -EventId 5417 }
+        $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
             $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
         }
         Catch {
             If ($_.Exception.Message -match '429') {
-                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                 Start-Sleep -Seconds 60
             }
@@ -210,10 +200,10 @@ Function Start-LogicMonitorSDT {
                 Invoke-Request: {4}`r
                 Headers: {5}`r
                 Body: {6}" -f
-                    [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                     ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                 )
-                If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                 Return "Error"
             }
@@ -221,4 +211,4 @@ Function Start-LogicMonitorSDT {
 
         $response
     }
-} #1.0.0.4
+} #1.0.0.5

@@ -8,6 +8,10 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 * From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.18
+* New behavior in logging. Instead of only logging to the Windows event log, the module now defaults to host only.
+* The EventLogSource parameter is still available. If the provided source does not exist, the command will switch to host-only output.
+* The new option is the LogPath parameter. Provide a path and file name (e.g. C:\Temp\log.txt) for logging. The module will attempt to create the log file, if it does not exist, and will switch to host-only output, if the file cannot be created (or the desired path is not writable).
 ## 1.0.1.17
 * When Invoke-Request returns an error, all cmdlets return more data about the contents. Previously, the exception message was all that was returned.
 * Added check for 429 respone to all cmdlets, to detect a rate-limiting situation and retry the request. Previously, only some of the cmdlets detected rate limiting.

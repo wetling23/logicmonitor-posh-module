@@ -18,6 +18,7 @@ Function Get-LogicMonitorDeviceSdt {
             V1.0.0.5 date: 23 August 2019
             V1.0.0.6 date: 26 August 2019
             V1.0.0.7 date: 18 October 2019
+            V1.0.0.8 date: 4 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -31,13 +32,13 @@ Function Get-LogicMonitorDeviceSdt {
         .PARAMETER Id
             Represents the device ID of the desired device.
         .PARAMETER EventLogSource
-            Default value is "LogicMonitorPowershellModule". Represents the name of the desired source, for Event Log logging.
-        .PARAMETER BlockLogging
-            When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
+            When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
+        .PARAMETER LogPath
+            When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDeviceSdt -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1
+            PS C:\> Get-LogicMonitorDeviceSdt -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1 -Verbose
 
-            In this example, the command gets all active SDTs for a server with the display name 'server1'.
+            In this example, the command gets all active SDTs for a server with the display name 'server1'. Verbose output is sent to the host.
         .EXAMPLE
             PS C:\> Get-LogicMonitorDeviceSdt -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 2
 
@@ -62,9 +63,9 @@ Function Get-LogicMonitorDeviceSdt {
         [Alias("DeviceId")]
         [string]$Id,
 
-        [string]$EventLogSource = 'LogicMonitorPowershellModule',
+        [string]$EventLogSource,
 
-        [switch]$BlockLogging
+        [string]$LogPath
     )
 
     Begin {
@@ -77,24 +78,13 @@ Function Get-LogicMonitorDeviceSdt {
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
     }
     Process {
-        If (-NOT($BlockLogging)) {
-            $return = Add-EventLogSource -EventLogSource $EventLogSource
-
-            If ($return -ne "Success") {
-                $message = ("{0}: Unable to add event source ({1}). No logging will be performed." -f [datetime]::Now, $EventLogSource)
-                Write-Warning $message
-
-                $BlockLogging = $True
-            }
-        }
-
         # Deal with getting and handling the device ID.
         Switch ($PsCmdlet.ParameterSetName) {
             { $_ -eq "DeviceIdFilter" } {
                 $resourcePath += "/$Id/sdts"
 
-                $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
-                If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
+                $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
             { $_ -eq "DeviceDisplayNameFilter" } {
                 # Get the device ID, based on the display name.
@@ -103,12 +93,12 @@ Function Get-LogicMonitorDeviceSdt {
                 If ($id -as [int64]) {
                     $resourcePath += "/$id/sdts"
 
-                    $message = ("{0}: Updated resource path to {1}." -f [datetime]::Now, $resourcePath)
-                    If (($BlockLogging) -AND (($PSBoundParameters['Verbose']) -or $VerbosePreference -eq 'Continue')) { Write-Verbose $message } ElseIf (($PSBoundParameters['Verbose']) -or ($VerbosePreference -eq 'Continue')) { Write-Verbose $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $message -EventId 5417 }
+                    $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
                 Else {
-                    $message = ("{0}: No device ID found for {1}. To prevent errors, {2} will exit." -f [datetime]::Now, $DisplayName, $MyInvocation.MyCommand)
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    $message = ("{0}: No device ID found for {1}. To prevent errors, {2} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DisplayName, $MyInvocation.MyCommand)
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                     Return "Error"
                 }
@@ -146,8 +136,8 @@ Function Get-LogicMonitorDeviceSdt {
             }
             Catch {
                 If ($_.Exception.Message -match '429') {
-                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f [datetime]::Now, $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($BlockLogging) { Write-Warning $message } Else { Write-Warning $message; Write-EventLog -LogName Application -Source $eventLogSource -EntryType Warning -Message $message -EventId 5417 }
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                     Start-Sleep -Seconds 60
                 }
@@ -158,10 +148,10 @@ Function Get-LogicMonitorDeviceSdt {
                         Invoke-Request: {4}`r
                         Headers: {5}`r
                         Body: {6}" -f
-                        [datetime]::Now, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                         ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                     )
-                    If ($BlockLogging) { Write-Error $message } Else { Write-Error $message; Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $message -EventId 5417 }
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                     Return "Error"
                 }
@@ -171,4 +161,4 @@ Function Get-LogicMonitorDeviceSdt {
 
         Return $response.items
     }
-} #1.0.0.7
+} #1.0.0.8
