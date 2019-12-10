@@ -167,9 +167,9 @@
 
                 Return "Error"
             }
-            ElseIf ($device.id) {
-                $Id = $device.id
-                $resourcePath = "/device/devices/$($device.id)"
+            ElseIf ($device.items.id) {
+                $Id = $device.items.id
+                $resourcePath = "/device/devices/$($device.items.id)"
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
