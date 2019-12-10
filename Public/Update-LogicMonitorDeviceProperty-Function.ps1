@@ -43,6 +43,7 @@
             V1.0.0.16 date: 26 August 2019
             V1.0.0.17 date: 18 October 2019
             V1.0.0.18 date: 4 December 2019
+            V1.0.0.19 date: 10 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -129,6 +130,34 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        }
+    }
+    Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                LogPath = $LogPath
+            }
+        }
+    }
+
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
@@ -138,7 +167,7 @@
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DisplayName)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @commandParams
 
             $resourcePath += "/$($device.id)"
 
@@ -149,7 +178,7 @@
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
@@ -296,4 +325,4 @@
     }
 
     Return $response
-} #1.0.0.18
+} #1.0.0.19

@@ -1,4 +1,4 @@
-﻿Function Get-LogicMonitorAlert2 {
+﻿Function Get-LogicMonitorAlert {
     <#
         .DESCRIPTION
             Retrieves Alert objects from LogicMonitor.

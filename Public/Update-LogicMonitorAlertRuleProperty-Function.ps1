@@ -17,6 +17,7 @@ Function Update-LogicMonitorAlertRuleProperty {
             V1.0.0.5 date: 26 August 2019
             V1.0.0.6 date: 18 October 2019
             V1.0.0.7 date: 4 December 2019
+            V1.0.0.8 date: 10 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -87,6 +88,34 @@ Function Update-LogicMonitorAlertRuleProperty {
         [string]$resourcePath = "/setting/alert/rules"
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+        # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            }
+        }
+        Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    LogPath = $LogPath
+                }
+            }
+        }
     }
     Process {
         $message = ("{0} is deprecated, in favor of Update-LogicMonitorAlertRule." -f $MyInvocation.MyCommand)
@@ -108,7 +137,7 @@ Function Update-LogicMonitorAlertRuleProperty {
                     $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $alertRule = Get-LogicMonitorAlertRules -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
+                    $alertRule = Get-LogicMonitorAlertRules -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
 
                     $resourcePath += "/$($alertRule.id)"
 
@@ -201,4 +230,4 @@ Function Update-LogicMonitorAlertRuleProperty {
             Return $response
         }
     }
-} #1.0.0.7
+} #1.0.0.8

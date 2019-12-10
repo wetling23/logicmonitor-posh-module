@@ -9,6 +9,7 @@ Function Update-LogicMonitorDashboard {
             V1.0.0.1 date: 26 August 2019
             V1.0.0.2 date: 18 October 2019
             V1.0.0.3 date: 4 December 2019
+            V1.0.0.4 date: 10 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -71,6 +72,34 @@ Function Update-LogicMonitorDashboard {
         [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+        # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            }
+        }
+        Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    LogPath = $LogPath
+                }
+            }
+        }
     }
     Process {
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -90,7 +119,7 @@ Function Update-LogicMonitorDashboard {
                 $message = ("{0}: Attempting to retrieve the alert rule ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                $dashboard = Get-LogicMonitorDashboard -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
+                $dashboard = Get-LogicMonitorDashboard -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
 
                 $resourcePath += "/$($dashboard.id)"
 
@@ -165,4 +194,4 @@ Function Update-LogicMonitorDashboard {
 
         $response
     }
-} #1.0.0.3
+} #1.0.0.4

@@ -14,6 +14,7 @@ Function Remove-LogicMonitorCollectorVersion {
             V1.0.0.4 date: 26 August 2019
             V1.0.0.5 date: 18 October 2019
             V1.0.0.6 date: 4 December 2019
+            V1.0.0.7 date: 10 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -76,6 +77,34 @@ Function Remove-LogicMonitorCollectorVersion {
         [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+        # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            }
+        }
+        Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $commandParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            }
+            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $commandParams = @{
+                    LogPath = $LogPath
+                }
+            }
+        }
     }
     Process {
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -100,7 +129,7 @@ Function Remove-LogicMonitorCollectorVersion {
                 $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Description)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDescriptionName $Description -EventLogSource $EventLogSource
+                $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDescriptionName $Description @commandParams
 
                 $resourcePath += "/$($collector.id)"
 
@@ -188,4 +217,4 @@ Function Remove-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.6
+} #1.0.0.7

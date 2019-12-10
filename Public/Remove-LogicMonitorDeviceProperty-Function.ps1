@@ -27,6 +27,7 @@
             V1.0.0.8 date: 26 August 2019
             V1.0.0.9 date: 18 October 2019
             V1.0.0.10 date: 4 December 2019
+            V1.0.0.11 date: 11 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -105,6 +106,34 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        }
+    }
+    Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                LogPath = $LogPath
+            }
+        }
+    }
+
     $message = ("{0}: Updated `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
@@ -120,7 +149,7 @@
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 If ($Id -eq $null) {
-                    $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Displayname $Displayname
+                    $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Displayname $Displayname @commandParams
                 }
 
                 If ($device.id) {
@@ -143,7 +172,7 @@
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 If ($Id -eq $null) {
-                    $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name
+                    $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
                 }
 
                 If ($device.count -gt 1) {
@@ -239,4 +268,4 @@
     }
 
     Return "Success"
-} #1.0.0.10
+} #1.0.0.11

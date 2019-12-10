@@ -50,6 +50,7 @@
             V1.0.0.18 date: 26 August 2019
             V1.0.0.19 date: 18 October 2019
             V1.0.0.20 date: 4 December 2019
+            V1.0.0.21 date: 10 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -315,4 +316,4 @@
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.20
+} #1.0.0.21

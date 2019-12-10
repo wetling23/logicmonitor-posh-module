@@ -2,7 +2,7 @@
     <#
         .DESCRIPTION
             Accepts a device ID, display name, or device IP/DNS name, then deletes it.
-        .NOTES 
+        .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 19 June 2017
                 - Initial release.
@@ -23,6 +23,7 @@
             V1.0.0.8 date: 26 August 2019
             V1.0.0.9 date: 18 October 2019
             V1.0.0.10 date: 4 December 2019
+            V1.0.0.11 date: 11 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -95,6 +96,34 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        }
+    }
+    Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                LogPath = $LogPath
+            }
+        }
+    }
+
     $message = ("{0}: Updated `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
@@ -107,10 +136,10 @@
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DisplayName)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName -EventLogSource $EventLogSource
-            
-            If ($device.id) {
-                $resourcePath = "/device/devices/$($device.id)"
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @commandParams
+
+            If ($device.items.id) {
+                $resourcePath = "/device/devices/$($device.items.id)"
             }
             Else {
                 $message = ("{0}: No device was returned when searching for {1}. To prevent errors, {2} will exit." `
@@ -128,7 +157,7 @@
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             If ($Id -eq $null) {
-                $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name -EventLogSource $EventLogSource
+                $device = Get-LogicMonitorDevices -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
             }
 
             If ($device.count -gt 1) {
@@ -212,4 +241,4 @@
     }
 
     Return $response
-} #1.0.0.10
+} #1.0.0.11
