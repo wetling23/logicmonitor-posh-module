@@ -60,7 +60,7 @@ Function Out-PsLogging {
         [string]$Message,
 
         [Parameter(Mandatory)]
-        [ValidateSet('Info', 'Warning', 'Error', 'Verbose')]
+        [ValidateSet('Info', 'Warning', 'Error', 'Verbose', 'First')]
         [string]$MessageType
     )
 
@@ -133,6 +133,7 @@ Function Out-PsLogging {
                 "Warning" { $Message | Add-Content -Path $LogPath; Write-Warning $Message }
                 "Error" { $Message | Add-Content -Path $LogPath; Write-Error $Message }
                 "Verbose" { $Message | Add-Content -Path $LogPath; Write-Verbose $Message }
+                "First" { $Message | Out-File -FilePath $LogPath; Write-Verbose $Message }
             }
         }
     }
