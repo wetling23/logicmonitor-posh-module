@@ -92,6 +92,11 @@ Function Remove-LogicMonitorCollectorVersion {
                     LogPath = $LogPath
                 }
             }
+            Else {
+                $commandParams = @{
+                    Verbose = $true
+                }
+            }
         }
         Else {
             If ($EventLogSource -and (-NOT $LogPath)) {

@@ -7,6 +7,7 @@
             V1.0.0.0 date: 26 August 2019
             V1.0.0.1 date: 18 October 2019
             V1.0.0.2 date: 4 December 2019
+            V1.0.0.3 date: 11 December 2019
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -75,14 +76,37 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    If ($PSBoundParameters['Verbose']) {
-        $commandParams = @{
-            Verbose        = $true
-            EventLogSource = $EventLogSource
+    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        }
+        Else {
+            $commandParams = @{
+                Verbose = $true
+            }
         }
     }
     Else {
-        $commandParams = @{ EventLogSource = $EventLogSource }
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $commandParams = @{
+                EventLogSource = $EventLogSource
+            }
+        }
+        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $commandParams = @{
+                LogPath = $LogPath
+            }
+        }
     }
 
     $message = ("{0}: The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
@@ -167,4 +191,4 @@
     }
 
     $response
-} #1.0.0.2
+} #1.0.0.3
