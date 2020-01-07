@@ -6,6 +6,7 @@ Function Out-PsLogging {
             Author: Mike Hashemi
             V1.0.0.0 date: 3 December 2019
                 - Initial release.
+            V1.0.0.1 date: 7 January 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -96,7 +97,7 @@ Function Out-PsLogging {
     ElseIf ($PsCmdlet.ParameterSetName -eq "File") {
         # Check if we have rights to the path in $LogPath.
         Try {
-            [io.file]::OpenWrite($LogPath).close()
+            [System.Io.File]::OpenWrite($LogPath).Close()
         }
         Catch {
             Write-Error ("{0}: Unable to write to the log file path ({1}). No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $LogPath)
@@ -129,12 +130,12 @@ Function Out-PsLogging {
         }
         "LogFile" {
             Switch ($MessageType) {
-                "Info" { $Message | Add-Content -Path $LogPath; Write-Host $Message }
-                "Warning" { $Message | Add-Content -Path $LogPath; Write-Warning $Message }
-                "Error" { $Message | Add-Content -Path $LogPath; Write-Error $Message }
-                "Verbose" { $Message | Add-Content -Path $LogPath; Write-Verbose $Message }
-                "First" { $Message | Out-File -FilePath $LogPath; Write-Verbose $Message }
+                "Info" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Host $Message }
+                "Warning" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Warning $Message }
+                "Error" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Error $Message }
+                "Verbose" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Verbose $Message }
+                "First" { [System.IO.File]::WriteAllText($LogPath, $Message); Write-Verbose $Message }
             }
         }
     }
-} #1.0.0.0
+} #1.0.0.1
