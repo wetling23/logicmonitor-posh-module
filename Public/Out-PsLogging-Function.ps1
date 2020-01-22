@@ -7,6 +7,7 @@ Function Out-PsLogging {
             V1.0.0.0 date: 3 December 2019
                 - Initial release.
             V1.0.0.1 date: 7 January 2020
+            V1.0.0.2 date: 22 January 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -130,12 +131,12 @@ Function Out-PsLogging {
         }
         "LogFile" {
             Switch ($MessageType) {
-                "Info" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Host $Message }
-                "Warning" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Warning $Message }
-                "Error" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Error $Message }
-                "Verbose" { [System.IO.File]::AppendAllText($LogPath, $Message); Write-Verbose $Message }
-                "First" { [System.IO.File]::WriteAllText($LogPath, $Message); Write-Verbose $Message }
+                "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Host $Message }
+                "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Warning $Message }
+                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Error $Message }
+                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Verbose $Message }
+                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message); Write-Verbose $Message }
             }
         }
     }
-} #1.0.0.1
+} #1.0.0.2
