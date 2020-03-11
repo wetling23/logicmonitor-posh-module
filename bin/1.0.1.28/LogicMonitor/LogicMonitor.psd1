@@ -16,7 +16,7 @@
     CompanyName       = 'Synoptek'
 
     # Copyright statement for this module
-    Copyright         = '(c) 2018 mhashemi. All rights reserved.'
+    Copyright         = '(c) 2020 mhashemi. All rights reserved.'
 
     # Description of the functionality provided by this module
     Description       = 'LogicMonitor REST API-related functions.'
