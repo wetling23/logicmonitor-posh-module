@@ -23,13 +23,13 @@ Function Update-LogicMonitorDashboard {
         .PARAMETER Name
             Represents the dashboard display name. Accepts pipeline input. Must be unique in LogicMonitor. Either this or the Id is required.
         .PARAMETER Properties
-            Hash table of alert-rule properties supported by LogicMonitor. See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/dashboards/update-a-dashboard/, for field names/data types.
+            Hash table of dashboard properties supported by LogicMonitor. See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/dashboards/update-a-dashboard/, for field names/data types.
         .PARAMETER EventLogSource
             When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> $dashboard = Get-LogicMonitorDashboard -AccessId <access id> -AccessKey <access key> -AccountName <account name> -Id 1
+            PS C:\> $dashboard = Get-LogicMonitorDashboard -AccessId <access id> -AccessKey <access key> -AccountName <account name> -Id 1 -Verbose
             PS C:\> $dashboardProperties = @{ }
             PS C:\> $dashboard.psobject.properties | ForEach-Object { $dashboardProperties[$_.Name] = $_.Value }
             PS C:\> $DashboardProperties.WidgetTokens | Where-Object { $_.Name -match 'default' -and $_.Value -match 'Rebel Alliance' } | ForEach-Object { $_.Value = $_.Value -replace 'Rebel Alliance', 'CDS-Northwest' }
@@ -37,7 +37,7 @@ Function Update-LogicMonitorDashboard {
             PS C:\> $DashboardProperties.WidgetTokens | ForEach-Object { $_.PSObject.Members.Remove('inheritList') }
             PS C:\> Update-LogicMonitorDashboard -AccessId <access id> -AccessKey <access key> -AccountName <account name> -Id 1 -Properties $dashboardProperties -Verbose
 
-            This example shows how to retrieve a dashboard (with Id 1), modify the "WidgetTokens" field and update the rule. Verbose output is sent to the host.
+            This example shows how to retrieve a dashboard (with Id 1), modify the "WidgetTokens" field and update the dashboard. Verbose output is sent to the host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
@@ -121,7 +121,7 @@ Function Update-LogicMonitorDashboard {
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
             "Name" {
-                $message = ("{0}: Attempting to retrieve the alert rule ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
+                $message = ("{0}: Attempting to retrieve the dashboard ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 $dashboard = Get-LogicMonitorDashboard -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
@@ -134,6 +134,25 @@ Function Update-LogicMonitorDashboard {
         }
 
         $data = $Properties | ConvertTo-Json
+
+        $data = @{
+            id           = $id
+            widgetTokens = @{
+                widgetTokens = @($properties | convertto-json) 
+            }
+        }
+        
+        "widgetTokens": 
+        "\"widgetTokens\":
+            [
+                {\"name\":\"defaultDeviceGroup\",\"value\":\"*\"}
+                {\"name\":\"defaultServiceGroup\",\"value\":\"*\"}
+            ]",
+
+        $DashboardProperties.WidgetTokens | ForEach-Object { $_.PSObject.Members.Remove('type') }
+        PS C:\> $DashboardProperties.WidgetTokens | ForEach-Object { $_.PSObject.Members.Remove('inheritList') }
+
+
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
