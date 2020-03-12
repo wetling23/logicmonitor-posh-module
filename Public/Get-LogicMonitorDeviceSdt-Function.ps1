@@ -1,6 +1,6 @@
 Function Get-LogicMonitorDeviceSdt {
     <#
-        .DESCRIPTION 
+        .DESCRIPTION
             Retrieves a list of Standard Down Time (SDT) entries from LogicMonitor, for a specific device. This cmdlet uses the /device/devices tree.
         .NOTES
             Author: Mike Hashemi
