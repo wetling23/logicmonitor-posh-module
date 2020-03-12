@@ -8,6 +8,7 @@ Function Get-LogicMonitorRawData {
             Author: Mike Hashemi
             V1.0.0.0 date: 11 March 2020
                 - Initial release
+            V1.0.0.0 date: 12 March 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -16,12 +17,14 @@ Function Get-LogicMonitorRawData {
             LogicMonitor REST API access key.
         .PARAMETER AccountName
             LogicMonitor portal account name.
-        .PARAMETER DeviceId
-            LogicMonitor device Id.
+        .PARAMETER Id
+            Represents the LogicMonitor device ID of the desired device.
+        .PARAMETER DisplayName
+            Represents the display name of the desired device.
         .PARAMETER DataSourceName
             Represents the name (not display name) of the desired DataSource.
         .PARAMETER DataPointName
-            Represents the name of the desired datapoint
+            Represents the name of the desired datapoint. When included, the cmdlet will return raw data only for this datapoint. When not included, data from all datapoints will be returned. The maximum number of lines is 500 lines.
         .PARAMETER Range
             Represents the time range, for which the command will query the API.
         .PARAMETER EventLogSource
@@ -35,7 +38,7 @@ Function Get-LogicMonitorRawData {
         .EXAMPLE
             PS C:\> Get-LogicMonitorRawData -AccessId <access Id> -AccessKey <access key> -AccountName company -DeviceId 234 -DataSourceName wincpu -Range All -Verbose
 
-            In this example, the command connects to the API and returns the raw data for all instances of wincpu (up to 500 entries). Verbose logging is sent to the console.
+            In this example, the command connects to the API and returns the raw data for all instances of wincpu (up to 500 lines). Verbose logging is sent to the console.
     #>
     [CmdletBinding()]
     param(
@@ -48,8 +51,11 @@ Function Get-LogicMonitorRawData {
         [Parameter(Mandatory)]
         [string]$AccountName,
 
-        [Parameter(Mandatory)]
-        [int64]$DeviceId,
+        [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
+        [int64]$Id,
+
+        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
+        [string]$DisplayName,
 
         [Parameter(Mandatory)]
         [string]$DataSourceName,
@@ -70,12 +76,38 @@ Function Get-LogicMonitorRawData {
 
     # Initialize variables.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $resourcePath = "/device/devices/$DeviceId/instances"
+    $resourcePath = "/device/devices"
     $queryParams = $null
-    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+    Switch ($PsCmdlet.ParameterSetName) {
+        "IdFilter" {
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Id $Id
+        }
+        "NameFilter" {
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $DisplayName
+        }
+    }
+
+    If ($device.id) {
+        $message = ("{0}: Found a device matching ID {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $device.id)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+        $resourcePath += "/$($device.Id)/instances"
+
+        $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    }
+    Else {
+        $message = ("{0}: Unable to identify the desired device in LogicMonitor. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+
+        Return "Error"
+    }
+
+    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
+    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $resourcePath
@@ -94,7 +126,7 @@ Function Get-LogicMonitorRawData {
         "X-Version"     = 2
     }
 
-    $message = ("{0}: Attempting to get the list of DataSources on {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DeviceId)
+    $message = ("{0}: Attempting to get the list of DataSources on {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Id)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
@@ -108,7 +140,7 @@ Function Get-LogicMonitorRawData {
             Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error getting flap data. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error getting applied DataSources. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                 Error message: {2}`r
                 Error code: {3}`r
                 Invoke-Request: {4}`r
@@ -124,13 +156,13 @@ Function Get-LogicMonitorRawData {
     }
 
     If (-NOT($appliedDataSources) -or $appliedDataSources -eq "Error") {
-        $message = ("{0}: No Datasources were returned." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        $message = ("{0}: No Datasources were returned for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $device.displayName)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Return "Error"
     }
 
-    $message = ("{0}: Filtering for monitored instances of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DataSourceName)
+    $message = ("{0}: Filtering for monitored instances of {1} on {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DataSourceName, $device.displayName)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     $instances = $appliedDataSources.items | Where-Object { ($_.name -match $DataSourceName) -and ($_.stopMonitoring -eq $false) }
@@ -176,7 +208,7 @@ Function Get-LogicMonitorRawData {
 
         # This is where we start getting datapoint values
         $queryParams = "?start=$start&end=$end&size=1000"
-        $resourcePath = "/device/devices/$DeviceId/devicedatasources/$($instance.deviceDataSourceId)/instances/$($instance.id)/data"
+        $resourcePath = "/device/devices/$($device.id)/devicedatasources/$($instance.deviceDataSourceId)/instances/$($instance.id)/data"
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
         $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
@@ -253,16 +285,16 @@ Function Get-LogicMonitorRawData {
                     $properties[$dpNames[$n]] = $collectionValues[$n]
                 }
 
-                # Add time value to hashtable
+                # Add values to hashtable, not in the data from LM.
                 $properties['time'] = ([datetime]'1/1/1970').AddMilliSeconds($time)
-
                 $properties['instanceName'] = $out
+                $properties['device'] = $device.displayName
 
-                # Output object
+                # Output object.
                 [pscustomobject]$properties
             }
         }
 
         $valueObject
     }
-} #1.0.0.0
+} #1.0.0.1
