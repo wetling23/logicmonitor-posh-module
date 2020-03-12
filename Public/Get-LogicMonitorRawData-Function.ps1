@@ -169,7 +169,7 @@ Function Get-LogicMonitorRawData {
 
     $instances | ForEach-Object {
         $instance = $_
-        If ($instance.displayName) { $out = $instance.displayName } Else { $out = $DataSourceName }
+        If ($instance.displayName) { $out = $instance.displayName } Else { $out = $DataSourceName } # Not every DS has instances. In that case, just use the DS name for the instance name later on.
 
         $message = ("{0}: Attempting to get value data for the `"{1}`" instance." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $out)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -262,9 +262,11 @@ Function Get-LogicMonitorRawData {
             # The time stamp is in the time zone of the device that ran the query.
             $valueObject = for ($i = 0; $i -lt $datapoints.values.Count; $i++) {
                 [pscustomobject]@{
-                    InstanceName   = $out
                     $DataPointName = $datapoints.values[$i][$index]
-                    Time           = ([datetime]'1/1/1970').AddMilliSeconds($datapoints.time[$i])
+                    time           = ([datetime]'1/1/1970').AddMilliSeconds($datapoints.time[$i])
+                    datasourceName = $DataSourceName
+                    instanceName   = $out
+                    device         = $device.displayName
                 }
             }
         }
@@ -287,6 +289,7 @@ Function Get-LogicMonitorRawData {
 
                 # Add values to hashtable, not in the data from LM.
                 $properties['time'] = ([datetime]'1/1/1970').AddMilliSeconds($time)
+                $properties['datasourceName'] = $DataSourceName
                 $properties['instanceName'] = $out
                 $properties['device'] = $device.displayName
 
