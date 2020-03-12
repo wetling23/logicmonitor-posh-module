@@ -181,6 +181,7 @@ Function Update-LogicMonitorDashboard {
             Try {
                 $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
 
+                $dataSources += $response.items
                 $stopLoop = $True
             }
             Catch {
@@ -214,7 +215,7 @@ Function Update-LogicMonitorDashboard {
                 }
             }
         }
-        While ($stopLoop -eq $false)
+        While (($stopLoop -eq $false) -and ($total -gt $dataSources.Count))
 
         $response
     }
