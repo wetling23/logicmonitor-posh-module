@@ -8,6 +8,7 @@ Function Out-PsLogging {
                 - Initial release.
             V1.0.0.1 date: 7 January 2020
             V1.0.0.2 date: 22 January 2020
+            V1.0.0.3 date: 17 March 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -35,7 +36,7 @@ Function Out-PsLogging {
 
             In this example, the message, "Test" will be written to the host as a verbose message.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'SessionOnly')]
     param(
         [Parameter(Mandatory, ParameterSetName = 'EventLog')]
         [string]$EventLogSource,
@@ -55,7 +56,6 @@ Function Out-PsLogging {
         [Parameter(Mandatory, ParameterSetName = 'File')]
         [System.IO.FileInfo]$LogPath,
 
-        [Parameter(Mandatory, ParameterSetName = 'SessionOnly')]
         [switch]$ScreenOnly,
 
         [Parameter(Mandatory)]
@@ -108,7 +108,7 @@ Function Out-PsLogging {
 
         $logType = "LogFile"
     }
-    ElseIf ($PsCmdlet.ParameterSetName -eq "SessionOnly") {
+    Else {
         $logType = "SessionOnly"
     }
 
@@ -118,7 +118,8 @@ Function Out-PsLogging {
                 "Info" { Write-Host $Message }
                 "Warning" { Write-Warning $Message }
                 "Error" { Write-Error $Message }
-                "Verbose" { Write-Verbose $Message }
+                "Verbose" { Write-Verbose $Message -Verbose }
+                "First" { Write-Verbose $Message -Verbose }
             }
         }
         "EventLog" {
@@ -126,7 +127,8 @@ Function Out-PsLogging {
                 "Info" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Host $Message }
                 "Warning" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Warning -Message $Message -EventId 5417; Write-Warning $Message }
                 "Error" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $Message -EventId 5417; Write-Error $Message }
-                "Verbose" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message }
+                "Verbose" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
+                "First" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
             }
         }
         "LogFile" {
@@ -134,9 +136,9 @@ Function Out-PsLogging {
                 "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Host $Message }
                 "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Warning $Message }
                 "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Error $Message }
-                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Verbose $Message }
-                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message); Write-Verbose $Message }
+                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Verbose $Message -Verbose }
+                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message); Write-Verbose $Message -Verbose }
             }
         }
     }
-} #1.0.0.2
+} #1.0.0.3
