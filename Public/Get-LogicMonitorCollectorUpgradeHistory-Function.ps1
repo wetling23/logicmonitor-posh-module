@@ -17,6 +17,7 @@
             V1.0.0.5 date: 26 August 2019
             V1.0.0.6 date: 18 October 2019
             V1.0.0.7 date: 4 December 2019
+            V1.0.0.8 date: 15 May 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -27,6 +28,8 @@
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of histories to request from LogicMonitor.
+        .PARAMETER Version
+            Represents the value of "newVersion", for which to filter. When ommitted, the command retrieves all histories, regarless of collector version.
         .PARAMETER EventLogSource
             When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
         .PARAMETER LogPath
@@ -34,7 +37,11 @@
         .EXAMPLE
             PS C:\> Get-LogicMonitorCollectorUpgradeHistory -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Verbose
 
-            In this example, the function gets upgrade history for all collectors, in batches of 1000. Output is logged to the application log, and written to the host. Verbose output is sent to the host.
+            In this example, the function gets upgrade history for all collectors, in batches of 1000. Verbose output is sent to the host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorCollectorUpgradeHistory -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Version 28.005
+
+            In this example, the function gets upgrade history for all collectors, where "newVersion" is 28.005, in batches of 1000. Limited logging is written only to the console host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllCollectors')]
     Param (
@@ -46,6 +53,8 @@
 
         [Parameter(Mandatory)]
         [string]$AccountName,
+
+        [decimal]$Version,
 
         [int]$BatchSize = 1000,
 
@@ -69,9 +78,16 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    If ($Version) {
+        $filter = "&filter=newVersion:`"$Version`""
+    }
+    Else {
+        $filter = $null
+    }
+
     # Determine how many times "GET" must be run, to return all histories, then loop through "GET" that many times.
     While ($currentBatchNum -le $batchCount) {
-        $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+        $queryParams = "?offset=$offset&size=$BatchSize$filter"
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
@@ -97,7 +113,7 @@
             $headers = @{
                 "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
-                "X-Version"     = 2
+                "X-Version"     = 3
             }
         }
 
