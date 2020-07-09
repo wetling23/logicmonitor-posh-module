@@ -250,7 +250,7 @@
                 While ($stopLoop -eq $false)
 
                 If ($firstLoopDone -and ($null -ne $response)) {
-                    # If no dashboard ID or name is provided...
+                    # If no device ID or name is provided...
                     $devices.AddRange($response)
 
                     $message = ("{0}: There are {1} devices in `$devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $devices.count)
