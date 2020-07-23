@@ -25,6 +25,7 @@
             V1.0.0.8 date: 26 August 2019
             V1.0.0.9 date: 18 October 2019
             V1.0.0.10 date: 4 December 2019
+            V1.0.0.11 date: 23 July 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -37,6 +38,8 @@
             Mandatory parameter. Represents the long name of the EDGE Hub.
         .PARAMETER LMHostName
             Mandatory parameter. Represents the short name of the EDGE Hub.
+        .PARAMETER BlockStdErr
+            When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
             When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
         .PARAMETER LogPath
@@ -61,6 +64,8 @@
 
         [Parameter(Mandatory)]
         [string]$CollectorDisplayName,
+
+        [boolean]$BlockStdErr = $false,
 
         [string]$EventLogSource,
 
@@ -127,7 +132,7 @@
                 ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                 ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
             )
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
             Return "Error"
         }
@@ -141,14 +146,14 @@
         "1007" {
             $message = ("{0}: It appears that the web request failed. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
                     -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
             Return "Error"
         }
         Default {
             $message = ("{0}: Unexpected error creating a new collector in LogicMonitor. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
                     -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
             Return "Error"
         }
@@ -181,4 +186,4 @@
     }
 
     Return $response.data.id
-} #1.0.0.10
+} #1.0.0.11

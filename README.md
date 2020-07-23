@@ -8,6 +8,10 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 * From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.35
+* As of 23 July 2020, LogicMonitor's JobMonitor uses wscript (via lmbatchjobwrapper.js) to monitor the status of Windows scheduled tasks. There is a known bug in wscript that causes wscript to hang, when a given amount of data is written to the stderr stream. The result of the hang, is that the schedule tasks stops processing, but remains "running" until the job is ended, at which time, the script resumes from the spot at which it hung. This version of the module adds the -BlockStdErr parameter to all cmdlets. The default value of the parameter is "$false", which represents normal operation. When -BlockStdErr is set to "$true", the module's Out-PsLogging command will not write to the stderr stream. Instead, Write-Host is used with red text. LogicMonitor has been made aware of the bug and the resulting impact on JobMonitors.
+
+Discussion of the issue can be found at: https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk
 ## 1.0.1.29
 * First cmdlet that does not include support for TLS 1.1 connections. The command defaults to TLS 1.2.
 ## 1.0.1.18

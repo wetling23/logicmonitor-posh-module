@@ -18,6 +18,7 @@
             V1.0.0.5 date: 26 August 2019
             V1.0.0.6 date: 18 October 2019
             V1.0.0.7 date: 4 December 2019
+            V1.0.0.8 date: 23 July 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -32,6 +33,8 @@
             Represents IP address or FQDN of the desired device.
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of alert rules to request from LogicMonitor.
+        .PARAMETER BlockStdErr
+            When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
             When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
         .PARAMETER LogPath
@@ -66,6 +69,8 @@
         [string]$Name,
 
         [int]$BatchSize = 1000,
+
+        [boolean]$BlockStdErr = $false,
 
         [string]$EventLogSource,
 
@@ -167,7 +172,7 @@
                         ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                         ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                     )
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
                     Return "Error"
                 }
@@ -247,4 +252,4 @@
     }
 
     Return $alertRules
-} #1.0.0.7
+} #1.0.0.8
