@@ -10,6 +10,7 @@ Function Out-PsLogging {
             V1.0.0.2 date: 22 January 2020
             V1.0.0.3 date: 17 March 2020
             V1.0.0.4 date: 15 June 2020
+            V1.0.0.5 date: 23 July 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -122,7 +123,7 @@ Function Out-PsLogging {
             Switch ($MessageType) {
                 "Info" { Write-Host $Message }
                 "Warning" { Write-Warning $Message }
-                "Error" { If ($BlockStdErr) { <#Don't do anything#> } Else { Write-Error $Message } }
+                "Error" { If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
                 "Verbose" { Write-Verbose $Message -Verbose }
                 "First" { Write-Verbose $Message -Verbose }
             }
@@ -131,7 +132,7 @@ Function Out-PsLogging {
             Switch ($MessageType) {
                 "Info" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Host $Message }
                 "Warning" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Warning -Message $Message -EventId 5417; Write-Warning $Message }
-                "Error" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $Message -EventId 5417; If ($BlockStdErr) { <#Don't do anything#> } Else { Write-Error $Message } }
+                "Error" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $Message -EventId 5417; If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
                 "Verbose" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
                 "First" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
             }
@@ -143,10 +144,10 @@ Function Out-PsLogging {
             Switch ($MessageType) {
                 "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Host $Message }
                 "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Warning $Message }
-                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); If ($BlockStdErr) { <#Don't do anything#> } Else { Write-Error $Message } }
+                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
                 "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Verbose $Message -Verbose }
                 "First" { [System.IO.File]::WriteAllLines($LogPath, $Message); Write-Verbose $Message -Verbose }
             }
         }
     }
-} #1.0.0.4
+} #1.0.0.5
