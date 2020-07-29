@@ -135,19 +135,19 @@
 
     # Checking for the required properties
     If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
     If (-NOT($Properties.ContainsKey('displayName'))) {
-        $message = ("{0}: No display name provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No display name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
     If (-NOT($Properties.ContainsKey('preferredCollectorId'))) {
-        $message = ("{0}: No preferred collector ID provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No preferred collector ID provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
