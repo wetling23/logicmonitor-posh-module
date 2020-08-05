@@ -225,21 +225,3 @@
 
     Return $response
 } #1.0.0.0
-
-           
-
-$Settings = @{
-    deviceGroups        = @("*")
-    escalatingChainId   = "69"
-    escalationInterval  = "0"
-    instance            = "*"
-    levelStr            = "Critical"
-    name                = "test 2"
-    priority            = "999999999"
-    resourceProperties  = @(@{ name = 'prop1'; value = 'True' }, @{ name = 'prop2'; value = 'True' })
-    suppressAlertAckSdt = $false
-    suppressAlertClear  = $false
-}
-
-
-@{ name = 'isWebsite'; value = 'True' }, @{ name = 'isWebsite'; value = 'True' }
