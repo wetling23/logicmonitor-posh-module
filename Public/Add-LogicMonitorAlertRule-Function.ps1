@@ -5,6 +5,7 @@
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 29 July 2020
+            V1.0.0.1 date: 6 August 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -24,7 +25,7 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> $settings = @{
+            PS C:\> $Properties = @{
                         datapoint           = "*"
                         datasource          = "*"
                         deviceGroups        = @("GroupName/SubGroupName")
@@ -39,11 +40,11 @@
                         suppressAlertClear  = $false
                     }
 
-                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $settings -Verbose
+                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -Verbose
 
             In this example, the function will create an alert rule called "Error Test" with the specified properties (all required properties are specified). Verbose logging output will be written only to the host.
         .EXAMPLE
-            PS C:\> $settings = @{
+            PS C:\> $Properties = @{
                         deviceGroups        = @("*")
                         escalatingChainId   = 10
                         escalationInterval  = 0
@@ -56,7 +57,7 @@
                         suppressAlertClear  = $false
                     }
 
-                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $settings -LogPath C:\Temp\test.log
+                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -LogPath C:\Temp\test.log
 
             In this example, the function will create an alert rule called "Error Test" with the specified properties (not all required fields are included, causing default values to be used). Limited logging output will be written to C:\Temp\test.log.
     #>
@@ -72,7 +73,8 @@
         [string]$AccountName,
 
         [Parameter(Mandatory)]
-        [hashtable]$Settings,
+        [Alias("Settings")]
+        [hashtable]$Properties,
 
         [boolean]$BlockStdErr = $false,
 
@@ -108,7 +110,7 @@
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $Settings.Add('datasource', '*')
+            $Properties.Add('datasource', '*')
         }
         Catch {
             $message = ("{0}: Unexpected error adding default datasource value to the hash table. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -122,7 +124,7 @@
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $Settings.Add('instance', '*')
+            $Properties.Add('instance', '*')
         }
         Catch {
             $message = ("{0}: Unexpected error adding default instance value to the hash table. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -136,7 +138,7 @@
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $Settings.Add('datapoint', '*')
+            $Properties.Add('datapoint', '*')
         }
         Catch {
             $message = ("{0}: Unexpected error adding default datapoint value to the hash table. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -150,7 +152,7 @@
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $Settings.Add('escalationInterval', '0')
+            $Properties.Add('escalationInterval', '0')
         }
         Catch {
             $message = ("{0}: Unexpected error adding escalationInterval datasource value to the hash table. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -166,7 +168,7 @@
         Return "Error"
     }
 
-    $data = ($Settings | ConvertTo-Json)
+    $data = ($Properties | ConvertTo-Json)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -224,4 +226,4 @@
     }
 
     Return $response
-} #1.0.0.0
+} #1.0.0.1
