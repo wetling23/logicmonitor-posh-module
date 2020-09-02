@@ -52,6 +52,7 @@
             V1.0.0.20 date: 4 December 2019
             V1.0.0.21 date: 10 December 2019
             V1.0.0.22 date: 23 July 2020
+            V1.0.0.23 date: 1 September 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -66,6 +67,10 @@
             Represents display name of the desired device.
         .PARAMETER Name
             Represents IP address or FQDN of the desired device.
+        .PARAMETER Filter
+            Represents a string matching the API's filter format. This parameter can be used to filter for devices matching certain criteria (e.g. "Microsoft Windows Server 2012 R2 Standard" appears in systemProperties).
+
+            See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/devices/get-devices#Example-Request-5--GET-all-devices-that-have-a-spe
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of devices to request from LogicMonitor, in a single batch.
         .PARAMETER BlockStdErr
@@ -94,6 +99,11 @@
             PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local
 
             In this example, the function will search for the monitored device with "server1.domain.local" (the FQDN) in the name property and will return its properties.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=systemProperties.value:"Microsoft Windows Server 2012 R2 Standard"'
+
+            In this example, the function will search for monitored devices with "Microsoft Windows Server 2012 R2 Standard" as a value in one of the system properties. Other valid property lists include customProperties and inheritedPropreties.
+            Note that the quotes around the value are required.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllDevices')]
     [alias('Get-LogicMonitorDevices')]
@@ -118,6 +128,9 @@
         [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
         [string]$Name,
+
+        [Parameter(Mandatory, ParameterSetName = 'StringFilter')]
+        [string]$Filter,
 
         [int]$BatchSize = 1000,
 
@@ -159,12 +172,6 @@
 
     Do {
         Switch ($PsCmdlet.ParameterSetName) {
-            { $_ -in ("IDFilter", "AllDevices") } {
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
             "NameFilter" {
                 $queryParams = "?filter=displayName:`"$DisplayName`"&offset=$offset&size=$BatchSize&sort=id"
 
@@ -178,9 +185,6 @@
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
         }
-
-        # Construct the query URL.
-        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
         If ($firstLoopDone -eq $false) {
             $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -208,14 +212,24 @@
         }
 
         Switch ($PsCmdlet.ParameterSetName) {
-            "AllDevices" {
-                $message = ("{0}: Entering switch statement for all-device retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            { $_ -in ("AllDevices", "StringFilter") } {
+                $message = ("{0}: Entering switch statement for multi-device retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+                If ($Filter) {
+                    $message = ("{0}: Adding filter to the query string: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                    $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
+                }
+                Else {
+                    $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+                }
 
                 $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
                 # Make Request
                 $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -235,6 +249,12 @@
                             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                             Start-Sleep -Seconds 60
+                        }
+                        ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                            $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+                            Return "Error"
                         }
                         Else {
                             $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
@@ -272,6 +292,8 @@
             { $_ -in ("IDFilter", "NameFilter", "IPFilter") } {
                 $message = ("{0}: Entering switch statement for single-device retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
                 # Make Request
                 $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -320,5 +342,10 @@
     }
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
-    $devices
-} #1.0.0.22
+    If ($devices.items) {
+        $devices.items
+    }
+    Else {
+        $devices
+    }
+} #1.0.0.23
