@@ -53,6 +53,7 @@
             V1.0.0.21 date: 10 December 2019
             V1.0.0.22 date: 23 July 2020
             V1.0.0.23 date: 1 September 2020
+            V1.0.0.24 date: 2 September 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -333,7 +334,12 @@
                 }
                 While ($stopLoop -eq $false)
 
-                $devices.AddRange($response)
+                If ($response.Count -gt 1) {
+                    $devices.AddRange($response)
+                }
+                Else {
+                    $devices = $response
+                }
 
                 $message = ("{0}: There are {1} devices in `$devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($devices.count))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -342,10 +348,5 @@
     }
     Until (($null -eq $response) -or ($singleDeviceCheckDone))
 
-    If ($devices.items) {
-        $devices.items
-    }
-    Else {
-        $devices
-    }
-} #1.0.0.23
+    $devices
+} #1.0.0.24
