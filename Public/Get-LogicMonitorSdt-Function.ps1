@@ -1,9 +1,7 @@
 ﻿Function Get-LogicMonitorSdt {
     <#
         .DESCRIPTION
-            Retrieves a list of Standard Down Time (SDT) entries from LogicMonitor. The cmdlet allows for the retrieval of a specific SDT entry, all entries, or all entries initiated by a specific user. Uses /sdt/sdts.
-
-            The list of SDT entries are further filterable by type of monitored object.
+            Retrieves a list of Standard Down Time (SDT) entries from LogicMonitor.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 9 July 2018
@@ -22,6 +20,7 @@
             V1.0.0.7 date: 18 October 2019
             V1.0.0.8 date: 4 December 2019
             V1.0.0.9 date: 23 July 2020
+            V1.0.0.10 date: 2 October 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -30,6 +29,9 @@
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
+        .PARAMETER Filter
+            Represents a hash table defining an API query filter. Valid keys are: id, admin, comment, monthDay, hour, minute, endHour, endMinute, duration, startDateTimeOnLocal, startDateTime, endDateTimeOnLocal, 
+            endDateTime, isEffective, timezone, type, weekOfMonth, sdtType, weekDay, deviceId, deviceDisplayName. Invaid keys will be removed before calling the API.
         .PARAMETER Id
             Represents the ID of a specific SDT entry. Accepts pipeline input.
         .PARAMETER AdminName
@@ -47,28 +49,35 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorSdt -AccessId $accessID -AccessKey $accessKey -AccountName <account name> -Id A_8 -Verbose
+            PS C:\> Get-LogicMonitorSdt -AccessId $AccessID -AccessKey $accessKey -AccountName <account name> -Id A_8 -Verbose
 
             This example shows how to get the SDT entry with ID "A_8". Verbose output is sent to the host.
         .EXAMPLE
-            PS C:\> $allSdts = Get-LogicMonitorSdt -AccessId $accessID -AccessKey $accessKey -AccountName <account name> -Blocklogging
+            PS C:\> $allSdts = Get-LogicMonitorSdt -AccessId $AccessID -AccessKey $accessKey -AccountName <account name> -BlockLogging
 
-            This example shows how to get all SDT entries and store them in a variable called "allSdts". The command's logging is output only to the host, and not to the event log.
+            This example shows how to get all SDT entries and store them in a variable called "allSdts". The command's limited logging is output only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorSdt -AccessId $accessID -AccessKey $AccessKey -AccountName <account name> -AdminName <username> -SdtType DeviceGroupSDT
+            PS C:\> Get-LogicMonitorSdt -AccessId $AccessID -AccessKey $AccessKey -AccountName <account name> -AdminName <username> -SdtType DeviceGroupSDT
 
             This example shows how to get all device group SDT entries created by the user in <username>.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorSdt -AccessId $AccessID -AccessKey $AccessKey -AccountName <account name> -Filter @{deviceId = "101"; type = "DeviceSDT"} -Verbose -LogPath C:\Temp\log.txt
+
+            This example shows how to get all device-type SDT entries for the device with ID 101. Verbose logging is written to the host and to C:\Temp\log.txt
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllSdt')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [string]$AccessID,
 
         [Parameter(Mandatory)]
         [securestring]$AccessKey,
 
         [Parameter(Mandatory)]
         [string]$AccountName,
+
+        [Parameter(Mandatory, ParameterSetName = "FreeFilter")]
+        [hashtable]$Filter,
 
         [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias("SdtId")]
@@ -96,11 +105,11 @@
 
     Begin {
         # Initialize variables.
-        $filter = $null # The script
-        $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
+        [boolean]$firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all alerts.
+        $hashstr = $null # Filter as a string.
+        $sdts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the alerts.
+        $response = $null
         $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-        $sdtBatchCount = 1 # Define how many times we need to loop, to get all SDT entries.
-        $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all SDT entries.
         $httpVerb = "GET" # Define what HTTP operation will the script run.
         $resourcePath = "/sdt/sdts" # Define the resourcePath, based on what you're searching for.
         $queryParams = $null
@@ -112,13 +121,61 @@
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        # Update $resourcePath to filter for a specific SDT entry, when a SDT ID is provided by the user.
         Switch ($PsCmdlet.ParameterSetName) {
             { $_ -eq "Id" } {
                 $resourcePath += "/$Id"
 
                 $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            }
+            { $_ -eq "FreeFilter" } {
+                $message = ("{0}: Checking filter for invalid keys." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                Foreach ($key in $($Filter.keys)) {
+                    If ($key -notin 'id', 'admin', 'comment', 'monthDay', 'hour', 'minute', 'endHour', 'endMinute', 'duration', 'startDateTimeOnLocal', 'startDateTime', 'endDateTimeOnLocal', `
+                            'endDateTime', 'isEffective', 'timezone', 'type', 'weekOfMonth', 'sdtType', 'weekDay', 'deviceId', 'deviceDisplayName') {
+
+                        $message = ("{0}: Unable to filter by {1}, removing the entry." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $key)
+                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                        $filter.remove($key)
+                    }
+                }
+
+                $message = ("{0}: Converting special characters to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                Foreach ($clone in ($Filter.Clone()).Keys) {
+                    $filter.$clone = ($filter.$clone).Replace('"', '%2522')
+                    $filter.$clone = ($filter.$clone).Replace('&', '%26')
+                    $filter.$clone = ($filter.$clone).Replace("`r`n", "`n")
+                    $filter.$clone = ($filter.$clone).Replace('#', '%23')
+                    $filter.$clone = ($filter.$clone).Replace("`n", '%0A')
+                    $filter.$clone = ($filter.$clone).Replace(')', '%29')
+                    $filter.$clone = ($filter.$clone).Replace('(', '%28')
+                    $filter.$clone = ($filter.$clone).Replace('>', '%3E')
+                    $filter.$clone = ($filter.$clone).Replace('<', '%3C')
+                    $filter.$clone = ($filter.$clone).Replace('/', '%2F')
+                    $filter.$clone = ($filter.$clone).Replace(',', '%2C')
+                    $filter.$clone = ($filter.$clone).Replace('*', '%2A')
+                    $filter.$clone = ($filter.$clone).Replace('!', '%21')
+                    $filter.$clone = ($filter.$clone).Replace('=', '%3D')
+                    $filter.$clone = ($filter.$clone).Replace('~', '%7E')
+                    $filter.$clone = ($filter.$clone).Replace(' ', '%20')
+                    $filter.$clone = ($filter.$clone).Replace('|', '%7C')
+                    $filter.$clone = ($filter.$clone).Replace('$', '%24')
+                    $filter.$clone = ($filter.$clone).Replace('\', '%5C')
+                    $filter.$clone = ($filter.$clone).Replace('_', '%5F')
+                }
+
+                $message = ("{0}: Converting the filter hashtable to a string." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                foreach ($key in $($filter.keys)) {
+                    $hashstr += $key + ":" + "`"$($filter[$key])`"" + ","
+                }
+                $filter = ($hashstr.trimend(',')).Replace("`"", "%22")
             }
         }
 
@@ -154,35 +211,24 @@
         }
 
         # Determine how many times "GET" must be run, to return all SDT entries, then loop through "GET" that many times.
-        While ($currentBatchNum -lt $sdtBatchCount) {
-            Switch ($PsCmdlet.ParameterSetName) {
-                { $_ -in ("Id", "AllSdt") } {
-                    If ([string]::IsNullOrEmpty($filter)) {
-                        $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-                    }
-                    Else {
-                        $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
-                    }
+        While (($response.Count -ge 1) -or ($firstLoopDone -eq $false)) {
+            $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-                "AdminName" {
-                    If ([string]::IsNullOrEmpty($filter)) {
-                        $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-                    }
-                    Else {
-                        $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
-                    }
-
-                    $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
+            If ([string]::IsNullOrEmpty($filter)) {
+                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
             }
+            Else {
+                $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
+            }
+
+            $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             # Construct the query URL.
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
+            # Build header.
             If ($firstLoopDone -eq $false) {
                 $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -202,19 +248,20 @@
 
                 # Construct Headers
                 $headers = @{
-                    "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                    "Authorization" = "LMv1 $AccessID`:$signature`:$epoch"
                     "Content-Type"  = "application/json"
                     "X-Version"     = 2
                 }
             }
 
-            # Make Request
+            # Make the API request.
             $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
+            $stopLoop = $false
             Do {
                 Try {
-                    $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+                    $response = [System.Collections.Generic.List[PSObject]]@((Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop).items)
 
                     $stopLoop = $True
                 }
@@ -226,7 +273,7 @@
                         Start-Sleep -Seconds 60
                     }
                     Else {
-                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
                         Error code: {3}`r
                         Invoke-Request: {4}`r
@@ -243,54 +290,15 @@
             }
             While ($stopLoop -eq $false)
 
-            Switch ($PsCmdlet.ParameterSetName) {
-                { $_ -in ("AllSdt", "AdminName") } {
-                    $message = ("{0}: Entering switch statement for all-SDT retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            $sdts.AddRange($response)
 
-                    $sdts += $response.items
+            $message = ("{0}: Executed REST query. There are {1} entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $alerts.Count)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($sdts.count))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    # The first time through the loop, figure out how many times we need to loop (to get all SDT entries).
-                    If ($firstLoopDone -eq $false) {
-                        [int]$sdtBatchCount = ((($response.total) / $BatchSize) + 1)
-
-                        $message = ("{0}: {1} will query LogicMonitor {2} times to retrieve all SDT entries. LogicMonitor reports that there are {3} SDT entries." `
-                                -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $sdtBatchCount, $response.total)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                        $message = ("{0}: Completed the first loop." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                    }
-
-                    # Increment offset, to grab the next batch of SDT entries.
-                    $message = ("{0}: Incrementing the search offset by {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    $offset += $BatchSize
-
-                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $sdtBatchCount)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    # Increment the variable, so we know when we have retrieved all SDT entries.
-                    $currentBatchNum++
-                }
-                "Id" {
-                    $message = ("{0}: Entering switch statement for single-SDT retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    $sdts = $response
-
-                    Return $sdts
-
-                    $message = ("{0}: There are {1} SDT entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($sdts.count))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-            }
+            $offset += $BatchSize
+            $firstLoopDone = $true
         }
 
         Return $sdts
     }
-} #1.0.0.9
+} #1.0.0.10
