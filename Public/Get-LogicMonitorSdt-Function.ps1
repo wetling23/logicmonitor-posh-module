@@ -35,11 +35,11 @@
         .PARAMETER Id
             Represents the ID of a specific SDT entry. Accepts pipeline input.
         .PARAMETER AdminName
-            Represents the user name of the user who created the SDT entry.
+            Deprecated parameter. Represents the user name of the user who created the SDT entry.
         .PARAMETER SdtType
-            Represents the type of SDT entries which to return. Valid values are CollectorSDT, DeviceGroupSDT, DeviceSDT, ServiceCheckpointSDT, ServiceSDT.
+            Deprecated parameter. Represents the type of SDT entries which to return. Valid values are CollectorSDT, DeviceGroupSDT, DeviceSDT, ServiceCheckpointSDT, ServiceSDT.
         .PARAMETER IsEffective
-            When included, only returns SDT entries that are currently active.
+            Deprecated parameter. When included, only returns SDT entries that are currently active.
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of SDT entries to request from LogicMonitor, in a single batch.
         .PARAMETER BlockStdErr

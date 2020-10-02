@@ -30,8 +30,9 @@
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER StartDate
-            Represents the date and time the 
+            Represents the beginning of the time range, for which alerts will be retireved. If no value is provided (but an end date is provided), minus one day (-1) is used. If no start/end date is provided, up to the previous five years is used.
         .PARAMETER EndDate
+            Represents the end of the time range, for which alerts will be retireved. If no value is provided (but an end date is provided), the current date is used. If no start/end date is provided, up to the previous five years is used.
         .PARAMETER All
             Depricated parameter. When included, the cmdlet returns all open alerts, up to the LogicMonitor API limit (10000 as of 10 April 2019).
         .PARAMETER Filter
