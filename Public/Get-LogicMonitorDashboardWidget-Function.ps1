@@ -9,6 +9,7 @@
             V1.0.0.2 date: 4 December 2019
             V1.0.0.3 date: 11 December 2019
             V1.0.0.4 date: 23 July 2020
+            V1.0.0.5 date: 19 October 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -173,7 +174,7 @@
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
 
     Try {
@@ -203,4 +204,4 @@
     }
 
     $response
-} #1.0.0.4
+} #1.0.0.5
