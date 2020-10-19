@@ -16,6 +16,7 @@
             V1.0.0.6 date: 4 December 2019
             V1.0.0.7 date: 10 December 2019
             V1.0.0.8 date: 23 July 2020
+            V1.0.0.9 date: 19 October 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -26,10 +27,8 @@
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Id
             Mandatory parameter. Represents the website ID of a monitored website.
-        .PARAMETER PropertyName
-            Mandatory parameter. Represents the name of the target property. Note that LogicMonitor properties are case sensitive.
-        .PARAMETER PropertyValue
-            Mandatory parameter. Represents the value of the target property.
+        .PARAMETER PropertyTable
+            Represents a hash table of property name/value pairs for the target object.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
