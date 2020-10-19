@@ -74,7 +74,8 @@
     'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorSdt',
     'Start-LogicMonitorDeviceSdt',
     'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty', 'Update-LogicMonitorCollectorProperty',
-    'Update-LogicMonitorCollectorVersion', 'Update-LogicMonitorDeviceProperty', 'Update-LogicMonitorWebsiteProperty'
+    'Update-LogicMonitorCollectorVersion', 'Update-LogicMonitorDashboardWidgetProperty', 'Update-LogicMonitorDeviceProperty',
+    'Update-LogicMonitorWebsiteProperty'
 
     # Cmdlets to export from this module
     CmdletsToExport   = '*'
@@ -109,7 +110,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Added Update-LogicMonitorDashboardWidgetProperty.'
+            ReleaseNotes = 'Added Update-LogicMonitorDashboardWidgetProperty. For real this time.'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''
