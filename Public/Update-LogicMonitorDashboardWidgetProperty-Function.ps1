@@ -5,6 +5,7 @@
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 19 October 2020
+            V1.0.0.1 date: 21 October 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -48,9 +49,6 @@
 
         [Parameter(Mandatory, ParameterSetName = 'Default')]
         [int]$Id,
-
-        [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
-        [string]$DisplayName,
 
         [Parameter(Mandatory)]
         [hashtable]$PropertyTable,
@@ -112,20 +110,7 @@
         }
     }
 
-    # Update $resourcePath to filter for a specific dashboard, when a dashboard ID or dashboard name is provided by the user.
-    Switch ($PsCmdlet.ParameterSetName) {
-        "IdFilter" {
-            $resourcePath += "/$Id"
-        }
-        "NameFilter" {
-            $message = ("{0}: Attempting to retrieve the website ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-            $dashboard = Get-LogicMonitorDashboard -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
-
-            $resourcePath += "/$($dashboard.id)"
-        }
-    }
+    $resourcePath += "/$Id"
 
     $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -172,7 +157,7 @@
             Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error updating LogicMonitor website property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error updating LogicMonitor widget property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
             Error message: {2}`r
             Error code: {3}`r
             Invoke-Request: {4}`r
@@ -188,4 +173,4 @@
     }
 
     Return $response
-} #1.0.0.0
+} #1.0.0.1
