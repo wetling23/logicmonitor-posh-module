@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.48
+- Get-LogicMonitorDevice
+  - Changed the output so that all parameter discard properties from LogicMontior (e.g. total) and just return the "item(s)".
 ## 1.0.1.43
 - Get-LogicMonitorAlert
   - Added free-form filters (formatted as a hash table). If a key is provided, that is not supported by the API, it will be removed.

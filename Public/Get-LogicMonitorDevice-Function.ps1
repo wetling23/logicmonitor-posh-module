@@ -54,6 +54,7 @@
             V1.0.0.22 date: 23 July 2020
             V1.0.0.23 date: 1 September 2020
             V1.0.0.24 date: 2 September 2020
+            V1.0.0.25 date: 25 November 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -303,7 +304,7 @@
                 $stopLoop = $false
                 Do {
                     Try {
-                        $response = [System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop)
+                        $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
 
                         $stopLoop = $True
                         $firstLoopDone = $True
