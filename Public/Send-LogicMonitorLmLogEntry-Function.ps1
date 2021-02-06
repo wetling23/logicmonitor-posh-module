@@ -5,6 +5,7 @@
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 6 February 2021
+            V1.0.0.1 date: 6 February 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -155,8 +156,9 @@
     Else {
         $message = ("{0}: LogicMonitor did not accept the log-entry upload. If available, LogicMonitor returned:`r`n
             Success: {1}`r
-            Message: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.success, $response.message)
+            Message: {2}`r
+            Errors: {3}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.success, $response.message, ($response.errors | Out-String))
 
             Return "Error"
     }
-} #1.0.0.0
+} #1.0.0.1
