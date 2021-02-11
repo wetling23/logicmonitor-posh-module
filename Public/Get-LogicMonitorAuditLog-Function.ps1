@@ -27,6 +27,7 @@
             V1.0.0.9 date: 18 October 2019
             V1.0.0.10 date: 4 December 2019
             V1.0.0.11 date: 23 July 2020
+            V1.0.0.12 date: 7 February 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -39,6 +40,8 @@
             Represents the number of milliseconds from January 1, 1970 to the start date of the audit log filter.
         .PARAMETER EndDate
             Represents the number of milliseconds from January 1, 1970 to the end date of the audit log filter.
+        .PARAMETER Filter
+            String representation of the desired API filter. See also: https://www.logicmonitor.com/swagger-ui-master/dist/#/Audit%20Logs/getAuditLog
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of alerts to request from LogicMonitor.
         .PARAMETER BlockStdErr
@@ -50,7 +53,15 @@
         .EXAMPLE
             PS C:\> Get-LogicMonitorAuditLog -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Verbose
 
-            In this example, the function gets all audit log events, in batches of 1000. Verbose output is sent to the host.
+            In this example, the command gets all audit log entries, in batches of 1000, up to the API-imposed query limit. Verbose output is sent to the host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAuditLog -AccessId <access ID> -AccessKey <access key> -AccountName <account name> -Filter 'username:"*@*",_all~"*server1*",happenedOn>:0' -LogPath C:\Temp\log.txt
+
+            In this example, the command gets all audit log entries, in batches of 1000, up to the API-imposed query limit, where the username has an @ symbole in it, and the content includes "server1". Limited logging output is written to C:\Temp\log.txt
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAuditLog -AccessId <access ID> -AccessKey <access key> -AccountName <account name> -Filter 'username:"*@*",_all~"*server1*",happenedOn<:1612705657,happenedOn>:1612619257"'
+
+            In this example, the command gets all audit log entries, in batches of 1000, up to the API-imposed query limit, where the username has an @ symbole in it, and the content includes "server1". The query only returns those entries dated between the indicated dates.
     #>
     [CmdletBinding()]
     [alias('Get-LogicMonitorAuditLogs')]
@@ -64,9 +75,14 @@
         [Parameter(Mandatory)]
         [string]$AccountName,
 
+        [Parameter(Mandatory, ParameterSetName = 'DateFilter')]
         $StartDate,
 
+        [Parameter(Mandatory, ParameterSetName = 'DateFilter')]
         $EndDate,
+
+        [Parameter(ParameterSetName = 'StringFilter')]
+        [string]$Filter,
 
         [int]$BatchSize = 1000,
 
@@ -85,45 +101,72 @@
     $batchCount = 0 # Counter so we know how many times we have looped through the request
     $loopDone = $false # Switch for knowing when to stop requesting alerts. Will change to $true once $response.data.items.count is a positive number.
     $firstLoopDone = $false
+    $max = $false # Used to stop the command when the API-specified query limit is reached.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
+    $resourcePath = "/setting/accesslogs"
     $regex = "^[0-9]*$" # Used later, to confirm that the start and end times are in the correct format.
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
-    $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
-    [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-        
-    # Define the resourcePath.
-    $resourcePath = "/setting/accesslogs"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-    # Verify that $startDate and $endDate were provided correctly. If not provided, set start date as 24 hours before now.
-    If ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $null) -and ($EndDate -eq $null))) {
-        #If only StartDate /or/ EndDate are provided.
-        $message = ("Both the start and end dates are required. You entered {0} for StartDate and {1} for EndDate. To prevent errors, {2} will exit." -f $StartDate, $EndDate, $MyInvocation.MyCommand)
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+    Switch ($PsCmdlet.ParameterSetName) {
+        "DateFilter" {
+            # Verify that $startDate and $endDate were provided correctly. If not provided, set start date as 24 hours before now.
+            If ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $null) -and ($EndDate -eq $null))) {
+                #If only StartDate /or/ EndDate are provided.
+                $message = ("Both the start and end dates are required. You entered {0} for StartDate and {1} for EndDate. To prevent errors, {2} will exit." -f $StartDate, $EndDate, $MyInvocation.MyCommand)
+                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
-        Return
+                Return
+            } ElseIf ((($StartDate -ne $null) -and ($StartDate -notmatch $regex)) -or (($EndDate -ne $null) -and ($EndDate -notmatch $regex))) {
+                #If StartDate or EndDate are provided, but are not in the correct format.
+                $message = ("StartDate and EndDate must be in the format of milliseconds since January 1, 1970. You entered {0} for StartDate and {1} for EndDate. To prevent errors, {2} will exit." -f $StartDate, $EndDate, $MyInvocation.MyCommand)
+                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+
+                Return
+            } ElseIf (($StartDate -eq $null) -and ($EndDate -eq $null)) {
+                #If neither StartDate nor EndDate are provided.
+                $message = ("Neither StartDate nor EndDate were provided. Using the last 24-hours.")
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $startDate = [int][double]::Parse((Get-Date (Get-Date).AddHours(-24) -UFormat "%s"))
+                $endDate = [int][double]::Parse((Get-Date -UFormat "%s"))
+            }
+
+            $Filter = "filter=happenedOn<:$endDate,happenedOn>:$startDate"
+        }
+        "StringFilter" {
+            If ($Filter.Length -lt 2) {
+                $message = ("{0}: Adding `"happenedOn`" to the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $Filter = "filter=happenedOn%3E%3A%220%22"
+            }
+            If ($Filter -notmatch 'happenedOn') {
+                $message = ("{0}: Adding `"happenedOn`" to the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $Filter = "$Filter,happenedOn%3E%3A%220%22"
+            }
+
+            If (-NOT($Filter -match 'filter\=')) {
+                $message = ("{0}: Adding `"filter=`" to the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                $Filter = "filter=$Filter"
+            }
+        }
     }
-    ElseIf ((($StartDate -ne $null) -and ($StartDate -notmatch $regex)) -or (($EndDate -ne $null) -and ($EndDate -notmatch $regex))) {
-        #If StartDate or EndDate are provided, but are not in the correct format.
-        $message = ("StartDate and EndDate must be in the format of milliseconds since January 1, 1970. You entered {0} for StartDate and {1} for EndDate. To prevent errors, {2} will exit." -f $StartDate, $EndDate, $MyInvocation.MyCommand)
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
-        Return
-    }
-    ElseIf (($StartDate -eq $null) -and ($EndDate -eq $null)) {
-        #If neither StartDate nor EndDate are provided.
-        $message = ("Neither StartDate nor EndDate were provided. Using the last 24-hours.")
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    $message = ("{0}: Filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        $startDate = [int][double]::Parse((Get-Date (get-date).AddHours(-24) -UFormat "%s"))
-        $endDate = [int][double]::Parse((Get-Date -UFormat "%s"))
-    }
 
     # Retrieve log entires.
     While ($loopDone -ne $true) {
         $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        $queryParams = "?offset=$offset&size=$BatchSize&&filter=happenedOn<:$endDate,happenedOn>:$startDate"
+        $queryParams = "?offset=$offset&size=$BatchSize&sort=-happenedOn&$Filter"
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
@@ -150,6 +193,7 @@
             $headers = @{
                 "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
+                "X-Version"     = 3
             }
 
             $firstLoopDone = $true
@@ -172,6 +216,13 @@
 
                     Start-Sleep -Seconds 60
                 }
+                ElseIf ($_.ErrorDetails.Message -match 'the query limitation of auditLog is 10000') {
+                    $message = ("{0}: Reached the query limitation of 10000." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                    $stopLoop = $true
+                    $max = $true
+                }
                 Else {
                     $message = ("{0}: Unexpected error getting audit log entries. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
@@ -190,14 +241,22 @@
         }
         While ($stopLoop -eq $false)
 
-        $logEntries += $response.data.items
+        If ($response.items) {
+            $logEntries += $response.items
+        }
+        ElseIf ($response.total -gt 0) {
+            $logEntries = $response
+        }
 
-        If ($response.data.items.Count -eq $BatchSize) {
+        If ($max -eq $true) {
+            $loopDone = $true
+        }
+        ElseIf ($response.items.Count -eq $BatchSize) {
             # The response was full of log entries (up to the number in $BatchSize), so there are probably more. Increment offset, to grab the next batch of log entries.
             $message = ("{0}: There are more log entries to retrieve. Incrementing offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $message = ("{0}: The value of `$response.data.items.count is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($response.data.items.Count))
+            $message = ("{0}: The value of `$response.items.count is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($response.items.Count))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $offset += $BatchSize
@@ -208,7 +267,7 @@
             $message = ("{0}: There are no more log entries to retrieve." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $message = ("{0}: The value of `$response.data.items.count is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($response.data.items.Count))
+            $message = ("{0}: The value of `$response.items.count is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($response.items.Count))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $loopDone = $true
@@ -216,4 +275,4 @@
     }
 
     Return $logEntries
-} #1.0.0.11
+} #1.0.0.12

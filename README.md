@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.54
+- Get-LogicMonitorAuditLog
+  - Added support for a string filter. The -StartDate and -EndDate parameters were moved to their own parameter set.
 ## 1.0.1.48
 - Get-LogicMonitorDevice
   - Changed the output so that all parameter discard properties from LogicMontior (e.g. total) and just return the "item(s)".
