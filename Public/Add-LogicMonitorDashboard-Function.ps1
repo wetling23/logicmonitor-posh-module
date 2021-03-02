@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorDashboardGroup {
+﻿Function Add-LogicMonitorDashboard {
     <#
         .DESCRIPTION
             Create a new LogicMonitor dashboard.
@@ -6,6 +6,7 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 2 March 2021
                 - Initial release.
+            V1.0.0.1 date: 2 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
