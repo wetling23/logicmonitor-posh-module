@@ -7,6 +7,7 @@
             V1.0.0.0 date: 2 March 2021
                 - Initial release.
             V1.0.0.1 date: 2 March 2021
+            V1.0.0.2 date: 2 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -86,11 +87,6 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $properties = @{
-        name = 'bgp test 2'
-        groupid = 1
-    }
-
     # Checking for the required properties
     If (-NOT($Properties.ContainsKey('name'))) {
         $message = ("{0}: No dashboard name provided. Please update the provided properties and re-submit the request.")
@@ -133,7 +129,7 @@
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 3
+        "X-Version"     = 2
     }
 
     # Make Request
@@ -168,4 +164,4 @@
 
     $response
 }
-#1.0.0.0
+#1.0.0.2
