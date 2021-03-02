@@ -10,6 +10,7 @@
             V1.0.0.3 date: 18 October 2019
             V1.0.0.4 date: 4 December 2019
             V1.0.0.5 date: 23 July 2020
+            V1.0.0.6 date: 2 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -21,7 +22,7 @@
         .PARAMETER Id
             Represents Id of the desired dashboard.
         .PARAMETER Name
-            Represents the name of the desired dashboard
+            Represents the name of the desired dashboard.
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of dashboard to request from LogicMonitor, in a single batch.
         .PARAMETER BlockStdErr
@@ -296,7 +297,13 @@
                 }
                 While ($stopLoop -eq $false)
 
-                $dashboards.AddRange($response)
+                If ($response.id) {
+                    $dashboards.AddRange($response)
+                }
+                Else {
+                    $message = ("{0}: No dashboard located matching `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message -BlockStdErr $BlockStdErr }
+                }
 
                 $message = ("{0}: There are {1} dashboards in `$dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($dashboards.count))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -308,4 +315,4 @@
     Until (($null -eq $response) -or ($singleDashCheckDone))
 
     $dashboards
-} #1.0.0.5
+} #1.0.0.6
