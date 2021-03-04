@@ -1,4 +1,4 @@
-Function Add-LogicMonitorDashboardWidget {
+﻿Function Add-LogicMonitorDashboardWidget {
     <#
         .DESCRIPTION
             Create a new LogicMonitor dashboard widget.
@@ -101,7 +101,7 @@ Function Add-LogicMonitorDashboardWidget {
         Return "Error"
     }
 
-    $data = ($Properties | ConvertTo-Json -depth 5)
+    $data = ($Properties | ConvertTo-Json)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -141,8 +141,8 @@ Function Add-LogicMonitorDashboardWidget {
             Start-Sleep -Seconds 60
         }
         Else {
-            $errormsg = Try{($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage)}Catch{$error[1].Exception.Message}
-            $errorcode = Try{($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode)}Catch{"none"}
+            $errormsg = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) } Catch { $error[1].Exception.Message }
+            $errorcode = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode) } Catch { "none" }
             $message = ("{0}: Unexpected error adding DashboardGroup called `"{1}`". To prevent errors, the cmdlet will exit. If present, the following details were returned:`r`n
                 Error message: {2}`r
                 Error code: {3}`r
