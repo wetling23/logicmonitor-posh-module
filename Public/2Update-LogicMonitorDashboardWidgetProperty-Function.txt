@@ -1,4 +1,4 @@
-﻿Function Update-LogicMonitorDashboardWidgetProperty {
+Function Update-LogicMonitorDashboardWidgetProperty {
     <#
         .DESCRIPTION
             Accept the ID of an existing widget and a hash table of properties, then update the target widget with the new/updated property values.
