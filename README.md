@@ -8,6 +8,11 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.61
+- Get-LogicMonitorConfigSourceData
+  - Instead of returning just the config content, the cmdlet now returns all of the instance properties.
+- Add-LogicMonitorDashboardWidget
+  - The error message no longer returns the entire body. In my testing, the body was really long and it was annoying to scroll back up to the beginning of the error message.
 ## 1.0.1.54
 - Get-LogicMonitorAuditLog
   - Added support for a string filter. The -StartDate and -EndDate parameters were moved to their own parameter set.

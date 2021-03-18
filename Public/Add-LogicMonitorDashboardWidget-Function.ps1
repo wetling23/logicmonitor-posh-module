@@ -6,6 +6,7 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 2 March 2021
                 - Initial release.
+            V1.0.0.1 date: 16 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -141,15 +142,15 @@
             Start-Sleep -Seconds 60
         }
         Else {
+            # Left the body out of the error message, because the body can be really long and it is annoying to have to scroll up to see the error message.
             $errormsg = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) } Catch { $error[1].Exception.Message }
             $errorcode = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode) } Catch { "none" }
             $message = ("{0}: Unexpected error adding DashboardGroup called `"{1}`". To prevent errors, the cmdlet will exit. If present, the following details were returned:`r`n
                 Error message: {2}`r
                 Error code: {3}`r
                 Invoke-Request: {4}`r
-                Headers: {5}`r
-                Body: {6}" -f
-                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Properties.Name, $errormsg, $errorcode, $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                Headers: {5}" -f
+                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Properties.Name, $errormsg, $errorcode, $_.Exception.Message, ($headers | Out-String)
             )
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
         }
@@ -159,4 +160,4 @@
 
     $response
 }
-#1.0.0.0
+#1.0.0.1

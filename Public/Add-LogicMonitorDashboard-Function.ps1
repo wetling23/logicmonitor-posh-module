@@ -8,6 +8,7 @@
                 - Initial release.
             V1.0.0.1 date: 2 March 2021
             V1.0.0.2 date: 2 March 2021
+            V1.0.0.3 date: 16 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -94,20 +95,8 @@
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('parentId'))) {
-        $message = ("{0}: No parent DashboardGroup ID provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
-        Return "Error"
-    }
-    If ($Properties.ContainsKey('customProperties') -and (-NOT($Properties.customProperties.ContainsKey('name')))) {
-        $message = ("{0}: Custom properties were supplied, but no name key was provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
-
-        Return "Error"
-    }
-
-    $data = ($Properties | ConvertTo-Json)
+    $data = ($Properties | ConvertTo-Json -Depth 5)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -127,7 +116,7 @@
 
     # Construct Headers
     $headers = @{
-        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
         "X-Version"     = 2
     }
@@ -164,4 +153,4 @@
 
     $response
 }
-#1.0.0.2
+#1.0.0.3
