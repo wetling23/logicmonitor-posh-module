@@ -7,6 +7,7 @@
             V1.0.0.0 date: 2 March 2021
                 - Initial release.
             V1.0.0.1 date: 16 March 2021
+            V1.0.0.2 date: 18 March 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -145,7 +146,7 @@
             # Left the body out of the error message, because the body can be really long and it is annoying to have to scroll up to see the error message.
             $errormsg = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) } Catch { $error[1].Exception.Message }
             $errorcode = Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode) } Catch { "none" }
-            $message = ("{0}: Unexpected error adding DashboardGroup called `"{1}`". To prevent errors, the cmdlet will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error adding widget called `"{1}`". To prevent errors, the cmdlet will exit. If present, the following details were returned:`r`n
                 Error message: {2}`r
                 Error code: {3}`r
                 Invoke-Request: {4}`r
@@ -160,4 +161,4 @@
 
     $response
 }
-#1.0.0.1
+#1.0.0.2
