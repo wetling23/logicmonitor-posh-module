@@ -8,6 +8,7 @@ Function Get-LogicMonitorConfigSourceData {
             V1.0.0.0 date: 12 March 2021
                 - Initial release.
             V1.0.0.1 date: 16 March 2021
+            V1.0.0.2 date: 1 April 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -370,10 +371,10 @@ Function Get-LogicMonitorConfigSourceData {
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 If ($EntryCount -eq "All") {
-                    $data.items | Sort-Object -Property pollTimestamp -Descending # Sorted this way, the newest backup is first in the list.
+                    $data.items | Sort-Object -Property pollTimestamp # Sorted this way, the newest backup is first in the list.
                 }
                 Else {
-                    $data.items | Sort-Object -Property pollTimestamp -Descending | Select-Object -Last $EntryCount # Sorted this way, the newest backup is first in the list.
+                    $data.items | Sort-Object -Property pollTimestamp | Select-Object -Last $EntryCount # Sorted this way, the newest backup is first in the list.
                 }
             } Else {
                 $message = ("{0}: No data returned." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -538,4 +539,4 @@ Function Get-LogicMonitorConfigSourceData {
         Return
     }
     #endregion Get data
-} #1.0.0.1
+} #1.0.0.2
