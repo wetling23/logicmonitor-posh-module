@@ -1,12 +1,11 @@
-Function Get-LogicMonitorReportGroup {
+Function Get-LogicMonitorReport {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor report groups. Accepts a ReportGroup name or ID to retrieve filtered data.
+            Returns a list of LogicMonitor reports. Accepts a ReportGroup name or ID to retrieve filtered data.
         .NOTES
             Author: Mike Hashemi
-            V1.0.0.0 date: 27 February 2020
+            V1.0.0.0 date: 6 April 2021
                 - Initial release
-            V1.0.0.1 date: 23 July 2020
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -19,8 +18,12 @@ Function Get-LogicMonitorReportGroup {
             Represents report ID of the desired report. Wildcard searches are not supported.
         .PARAMETER Name
             Represents display name of the desired report. A "like" search is conducted.
+        .PARAMETER Filter
+            Represents a string matching the API's filter format. This parameter can be used to filter for reports matching certain criteria (e.g. "dateRange" appears in properties).
+
+            See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/devices/get-devices#Example-Request-5--GET-all-devices-that-have-a-spe
         .PARAMETER BatchSize
-            Default value is 1000. Represents the number of devices to request in each batch.
+            Default value is 1000. Represents the number of instances to request in each batch.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
@@ -28,19 +31,23 @@ Function Get-LogicMonitorReportGroup {
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Verbose
+            PS C:\> Get-LogicMonitorReport -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Verbose
 
-            In this example, the function will search for all report groups, Verbose output is sent to the host.
+            In this example, the command will get all reports. Verbose logging output will be written to the session host only.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -LogPath log.txt
+            PS C:\> Get-LogicMonitorReport -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -LogPath log.txt
 
-            In this example, the function will search for a report group with "6" in the id property. Non-verbose output is sent to log.txt in the current directory.
+            In this example, the command will get the report with ID 6. Limited logging output will be written to log.txt in the current directory
         .EXAMPLE
-            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name "SQL Reports"
+            PS C:\> Get-LogicMonitorReport -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name "SQL Reports"
 
-            In this example, the function will search for a report with "SQL Reports" in the name property. Non-verbose output is returned to the shell.
+            In this example, the command will return reports with a name "like" "SQL Reports". Limited logging output is written to the session host only.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorReport -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=dateRange:"3month"' -Verbose -EventSource yourScript
+
+            In this example, the command will search for reports with "3month" as a value in the dateRange property. Note that the quotes around the value are required. Verbose logging output will be written to the Windows application log.
     #>
-    [CmdletBinding(DefaultParameterSetName = 'AllGroups')]
+    [CmdletBinding(DefaultParameterSetName = 'AllReports')]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -56,6 +63,9 @@ Function Get-LogicMonitorReportGroup {
 
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
+
+        [Parameter(Mandatory, ParameterSetName = 'StringFilter')]
+        [string]$Filter,
 
         [int]$BatchSize = 1000,
 
@@ -78,13 +88,13 @@ Function Get-LogicMonitorReportGroup {
     $groupBatchCount = 1 # Define how many times we need to loop, to get all devices.
     $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all devices.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $resourcePath = "/report/groups"
+    $resourcePath = "/report/reports"
     $queryParams = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: Retrieving report groups. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+    $message = ("{0}: Retrieving reports. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Update $resourcePath to filter for a specific report, when a report ID is provided by the user.
@@ -95,10 +105,10 @@ Function Get-LogicMonitorReportGroup {
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
     }
 
-    # Determine how many times "GET" must be run, to return all report groups, then loop through "GET" that many times.
+    # Determine how many times "GET" must be run, to return all reports, then loop through "GET" that many times.
     While ($currentBatchNum -lt $groupBatchCount) {
         Switch ($PsCmdlet.ParameterSetName) {
-            { $_ -in ("IDFilter", "AllGroups") } {
+            { $_ -in ("IDFilter", "AllReports") } {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
@@ -109,6 +119,9 @@ Function Get-LogicMonitorReportGroup {
 
                 $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            }
+            "StringFilter" {
+                $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
             }
         }
 
@@ -174,21 +187,21 @@ Function Get-LogicMonitorReportGroup {
         While ($stopLoop -eq $false)
 
         Switch ($PsCmdlet.ParameterSetName) {
-            "AllGroups" {
-                $message = ("{0}: Entering switch statement for all-report-group retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            { $_ -in ("AllReports", "StringFilter") } {
+                $message = ("{0}: Entering switch statement for multi-report retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 # If no report ID, IP/FQDN, or display name is provided...
-                $groups += $response.items
+                $reports += $response.items
 
-                $message = ("{0}: There are {1} report groups in `$groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($groups.count))
+                $message = ("{0}: There are {1} reports in `$reports." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($reports.count))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                # The first time through the loop, figure out how many times we need to loop (to get all report groups).
+                # The first time through the loop, figure out how many times we need to loop (to get all reports).
                 If ($firstLoopDone -eq $false) {
                     [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all report groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
+                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all reports." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                     $firstLoopDone = $true
@@ -197,42 +210,42 @@ Function Get-LogicMonitorReportGroup {
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
 
-                # Increment offset, to grab the next batch of report groups.
+                # Increment offset, to grab the next batch of reports.
                 $offset += $BatchSize
 
                 $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $groupBatchCount)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                # Increment the variable, so we know when we have retrieved all report groups.
+                # Increment the variable, so we know when we have retrieved all reports.
                 $currentBatchNum++
 
             }
-            # If a report ID, IP/FQDN, or display name is provided...
-            { $_ -in ("IDFilter", "Namefilter") } {
+            # If a report ID or name is provided...
+            { $_ -in ("IDFilter", "NameFilter") } {
                 $message = ("{0}: Entering switch statement for single-report-group retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-                    $groups = $response
+                    $reports = $response
                 } Else {
-                    $groups = $response.items
+                    $reports = $response.items
                 }
 
-                If ($groups.count -eq 0) {
-                    $message = ("{0}: There was an error retrieving the group. LogicMonitor reported that zero report groups were retrieved. The error is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.errmsg)
+                If ($reports.count -eq 0) {
+                    $message = ("{0}: There was an error retrieving the report. LogicMonitor reported that zero reports were retrieved. The error is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.errmsg)
                     If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
                     Return "Error"
                 } Else {
-                    $message = ("{0}: There are {1} report groups in `$groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($groups.count))
+                    $message = ("{0}: There are {1} reports in `$reports." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($reports.count))
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
 
-                # The first time through the loop, figure out how many times we need to loop (to get all report groups).
+                # The first time through the loop, figure out how many times we need to loop (to get all reports).
                 If ($firstLoopDone -eq $false) {
                     [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all report groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
+                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all reports." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                     $firstLoopDone = $True
@@ -244,11 +257,11 @@ Function Get-LogicMonitorReportGroup {
                 $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $groupBatchCount)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                # Increment the variable, so we know when we have retrieved all report groups.
+                # Increment the variable, so we know when we have retrieved all reports.
                 $currentBatchNum++
             }
         }
     }
 
-    Return $groups
-} #1.0.0.1
+    Return $reports
+} #1.0.0.0
