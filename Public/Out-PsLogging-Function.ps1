@@ -10,7 +10,8 @@ Function Out-PsLogging {
             V1.0.0.2 date: 22 January 2020
             V1.0.0.3 date: 17 March 2020
             V1.0.0.4 date: 15 June 2020
-            V1.0.0.5 date: 23 July 2020
+            V1.0.0.5 date: 30 June 2020
+            V1.0.0.6 date: 8 April 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -142,12 +143,12 @@ Function Out-PsLogging {
         }
         "LogFile" {
             Switch ($MessageType) {
-                "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Host $Message }
-                "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Warning $Message }
-                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
-                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message); Write-Verbose $Message -Verbose }
-                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message); Write-Verbose $Message -Verbose }
+                "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Host $Message }
+                "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Warning $Message }
+                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
+                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Verbose $Message -Verbose }
+                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message, [Text.Encoding]::Unicode); Write-Verbose $Message -Verbose }
             }
         }
     }
-} #1.0.0.5
+} #1.0.0.6
