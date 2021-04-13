@@ -1,12 +1,13 @@
 Function Get-LogicMonitorWebsiteGroup {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor website groups. Accepts a WebsiteGroup name or ID to retrieve filtered data.
+            Returns a list of LogicMonitor website groups. Accepts a WebsiteGroup name, ID, or a filter, to retrieve filtered data.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 27 February 2020
                 - Initial release
             V1.0.0.1 date: 23 July 2020
+            V1.0.0.2 date: 13 April 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -19,8 +20,12 @@ Function Get-LogicMonitorWebsiteGroup {
             Represents website ID of the desired website. Wildcard searches are not supported.
         .PARAMETER Name
             Represents display name of the desired website. Represents display name of the desired report. A "like" search is conducted.
+        .PARAMETER Filter
+            Represents a string matching the API's filter format. This parameter can be used to filter for website groups matching certain criteria (e.g. "siteType" appears in properties).
+
+            See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/devices/get-devices#Example-Request-5--GET-all-devices-that-have-a-spe
         .PARAMETER BatchSize
-            Default value is 1000. Represents the number of devices to request in each batch.
+            Default value is 1000. Represents the number of websites to request in each batch.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
@@ -34,11 +39,19 @@ Function Get-LogicMonitorWebsiteGroup {
         .EXAMPLE
             PS C:\> Get-LogicMonitorWebsiteGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -LogPath log.txt
 
-            In this example, the function will search for a website group with "6" in the id property. Non-verbose output is sent to log.txt in the current directory.
+            In this example, the function will search for a website group with "6" in the id property. Limited logging output is sent to log.txt in the current directory.
         .EXAMPLE
             PS C:\> Get-LogicMonitorWebsiteGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name cnn.com
 
             In this example, the function will search for a website with "cnn.com" in the name property. Non-verbose output is returned to the shell.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorWebsiteGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name cnn.com
+
+            In this example, the function will search for a website with "cnn.com" in the name property. Non-verbose output is returned to the shell. Limited logging output will be written only to the session host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorWebsiteGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter "filter=properties.name:`"siteType`",properties.value:`"iis`"" -Verbose -EventSource LmScript
+
+            In this example, the function will search for all websites with a property called "siteType", with a value of "iis". Verbose logging output will be written to the session host and the Application event log.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllGroups')]
     Param (
@@ -57,6 +70,9 @@ Function Get-LogicMonitorWebsiteGroup {
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [string]$Name,
 
+        [Parameter(Mandatory, ParameterSetName = 'StringFilter')]
+        [string]$Filter,
+
         [int]$BatchSize = 1000,
 
         [boolean]$BlockStdErr = $false,
@@ -73,12 +89,12 @@ Function Get-LogicMonitorWebsiteGroup {
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Initialize variables.
-    $currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
+    $websiteGroups = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
+    $singlewebsiteGroupCheckDone = $false # Controls when a Do loop exits, if we are getting a single dashboard (by ID or name).
     $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    $groupBatchCount = 1 # Define how many times we need to loop, to get all devices.
-    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all devices.
+    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all website groups.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $resourcePath = "/website/groups"
+    $resourcePath = "/website/groups" # Define the resourcePath, based on the type of website you're searching for.
     $queryParams = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
@@ -87,40 +103,37 @@ Function Get-LogicMonitorWebsiteGroup {
     $message = ("{0}: Retrieving website groups. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    # Update $resourcePath to filter for a specific website, when a website ID is provided by the user.
-    If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-        $resourcePath += "/$Id"
-
-        $message = ("{0}: A website ID was provided. Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-    }
-
-    # Determine how many times "GET" must be run, to return all website groups, then loop through "GET" that many times.
-    While ($currentBatchNum -lt $groupBatchCount) {
+    Do {
         Switch ($PsCmdlet.ParameterSetName) {
-            { $_ -in ("IDFilter", "AllGroups") } {
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
             "NameFilter" {
-                $queryParams = "?filter=name~`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
+            }
+            "StringFilter" {
+                $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
+            }
+            "AllGroups" {
+                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+            }
+            "IDFilter" {
+                # Update $resourcePath to filter for a specific website group, when a website group ID is provided by the user.
+                $resourcePath += "/$Id"
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
         }
 
-        # Construct the query URL.
-        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+        If ($queryParams) {
+            $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        }
 
         If ($firstLoopDone -eq $false) {
             $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             # Get current time in milliseconds
-            $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
+            $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
             # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
@@ -140,25 +153,32 @@ Function Get-LogicMonitorWebsiteGroup {
             }
         }
 
-        # Make request.
+        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+
+        # Make Request
         $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
+        $stopLoop = $false
         Do {
             Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
 
                 $stopLoop = $True
-            }
-            Catch {
+                $firstLoopDone = $True
+            } Catch {
                 If ($_.Exception.Message -match '429') {
                     $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                     Start-Sleep -Seconds 60
-                }
-                Else {
-                    $message = ("{0}: Unexpected error getting website(s). To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                } ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                    $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+                    Return "Error"
+                } Else {
+                    $message = ("{0}: Unexpected error getting website groups. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
                         Error code: {3}`r
                         Invoke-Request: {4}`r
@@ -175,84 +195,40 @@ Function Get-LogicMonitorWebsiteGroup {
         }
         While ($stopLoop -eq $false)
 
-        Switch ($PsCmdlet.ParameterSetName) {
-            "AllGroups" {
-                $message = ("{0}: Entering switch statement for all-website-group retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($firstLoopDone -and ($response.items.Count -gt 0)) {
+            $message = ("{0}: Found {1} more website groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                # If no website ID, IP/FQDN, or display name is provided...
-                $groups += $response.items
+            $websiteGroups.AddRange([System.Collections.Generic.List[PSObject]]@($response.items))
 
-                $message = ("{0}: There are {1} website groups in `$groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($groups.count))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                # The first time through the loop, figure out how many times we need to loop (to get all website groups).
-                If ($firstLoopDone -eq $false) {
-                    [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
-
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all website groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    $firstLoopDone = $true
-
-                    $message = ("{0}: Completed the first loop." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-
-                # Increment offset, to grab the next batch of website groups.
-                $offset += $BatchSize
-
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $groupBatchCount)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                # Increment the variable, so we know when we have retrieved all website groups.
-                $currentBatchNum++
-
+            If ($response.items.Count -eq 1) {
+                $stopLoop = $true
+            } Else {
+                $stopLoop = $false
             }
-            # If a website ID, IP/FQDN, or display name is provided...
-            { $_ -in ("IDFilter", "Namefilter") } {
-                $message = ("{0}: Entering switch statement for single-website-group retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        } ElseIf ($firstLoopDone -and $response.id) {
+            $websiteGroups = $response
 
-                If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-                    $groups = $response
-                }
-                Else {
-                    $groups = $response.items
-                }
+            $stopLoop = $true
+        } Else {
+            $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                If ($groups.count -eq 0) {
-                    $message = ("{0}: There was an error retrieving the group. LogicMonitor reported that zero website groups were retrieved. The error is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.errmsg)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+            $stopLoop = $true
+        }
 
-                    Return "Error"
-                }
-                Else {
-                    $message = ("{0}: There are {1} website groupss in `$groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($groups.count))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
+        $message = ("{0}: There are {1} website groups in `$websiteGroups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $websiteGroups.id.Count)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                # The first time through the loop, figure out how many times we need to loop (to get all website groups).
-                If ($firstLoopDone -eq $false) {
-                    [int]$groupBatchCount = ((($response.total) / $BatchSize) + 1)
+        If ($stopLoop -eq $false) {
+            # Increment offset, to grab the next batch of website groups.
+            $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all website groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupBatchCount)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    $firstLoopDone = $True
-
-                    $message = ("{0}: Completed the first loop." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $groupBatchCount)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                # Increment the variable, so we know when we have retrieved all website groups.
-                $currentBatchNum++
-            }
+            $offset += $BatchSize
         }
     }
+    Until (($stopLoop -eq $true) -or ($singlewebsiteGroupCheckDone))
 
-    Return $groups
-} #1.0.0.1
+    $websiteGroups
+} #1.0.0.2
