@@ -9,6 +9,7 @@ Function Get-LogicMonitorConfigSourceData {
                 - Initial release.
             V1.0.0.1 date: 16 March 2021
             V1.0.0.2 date: 1 April 2021
+            V1.0.0.3 date: 20 April 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -382,6 +383,12 @@ Function Get-LogicMonitorConfigSourceData {
             }
         }
     }
+    ElseIf (($appliedConfigSources.items.id) -and ($ConfigSourceName)) {
+        $message = ("{0}: No applied ConfigSources found under the name `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $ConfigSourceName)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+        Return
+    }
     ElseIf ($appliedConfigSources.items.id) {
         $message = ("{0}: Identified {1} applied ConfigSources. No ConfigSource filter provided, getting all instances." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedConfigSources.items.id.Count)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -451,11 +458,12 @@ Function Get-LogicMonitorConfigSourceData {
             }
             While ($stopLoop -eq $false)
 
+            $i = 0
             If ($instances.items) {
                 Foreach ($instance in $instances.items) {
                     $i++
 
-                    $message = ("{0}: Getting the most recent config backup for instance {1}. This is instance {2} of {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.id, $i, $desiredInstances.id.Count)
+                    $message = ("{0}: Getting the most recent config backup for instance {1}. This is instance {2} of {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.id, $i, $instances.items.Count)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                     $resourcePath = "/device/devices/$DeviceId/devicedatasources/$($cs.id)/instances/$($instance.id)/config"
@@ -539,4 +547,4 @@ Function Get-LogicMonitorConfigSourceData {
         Return
     }
     #endregion Get data
-} #1.0.0.2
+} #1.0.0.3
