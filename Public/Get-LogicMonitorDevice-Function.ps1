@@ -68,6 +68,11 @@
 
             In this example, the function will search for monitored devices with "Microsoft Windows Server 2012 R2 Standard" as a value in one of the system properties. Other valid property lists include customProperties and inheritedPropreties.
             Note that the quotes around the value are required.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorDevice -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=hostGroupIds~12345'
+
+            In this example, the function will search for monitored devices with "12345" in the list of host-group IDs.
+            Note that the quotes around the value are required.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllDevices')]
     [alias('Get-LogicMonitorDevices')]
