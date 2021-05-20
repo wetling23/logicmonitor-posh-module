@@ -118,7 +118,7 @@
 
     # Initialize variables.
     $devices = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
-    $singleDeviceCheckDone = $false # Controls when a Do loop exits, if we are getting a single dashboard (by ID or name).
+    $singleDeviceCheckDone = $false # Controls when a Do loop exits, if we are getting a single device (by ID or name).
     $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
     $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all devices.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
@@ -141,7 +141,6 @@
             }
             "StringFilter" {
                 $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
-
             }
             "AllDevices" {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
