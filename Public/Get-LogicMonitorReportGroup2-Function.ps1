@@ -1,7 +1,7 @@
-Function Get-LogicMonitorDashboardGroup {
+Function Get-LogicMonitorReportGroup {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor dashboard groups. Accepts a DashboardGroup name or ID to retrieve filtered data.
+            Returns a list of LogicMonitor report groups. Accepts a ReportGroup name or ID to retrieve filtered data.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 27 February 2020
@@ -17,11 +17,11 @@ Function Get-LogicMonitorDashboardGroup {
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Id
-            Represents dashboard ID of the desired dashboard. Wildcard searches are not supported.
+            Represents report ID of the desired report. Wildcard searches are not supported.
         .PARAMETER Name
-            Represents display name of the desired dashboard. Represents display name of the desired report. A "like" search is conducted.
+            Represents display name of the desired report. Represents display name of the desired report. A "like" search is conducted.
         .PARAMETER Filter
-            Represents a string matching the API's filter format. This parameter can be used to filter for dashboard groups rules matching certain criteria (e.g. "Acme Co" appears in fullPath).
+            Represents a string matching the API's filter format. This parameter can be used to filter for report groups rules matching certain criteria (e.g. "Acme Co" appears in fullPath).
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of devices to request in each batch.
         .PARAMETER BlockStdErr
@@ -31,21 +31,21 @@ Function Get-LogicMonitorDashboardGroup {
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDashboardGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Verbose
+            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Verbose
 
-            In this example, the function will search for all dashboard groups, Verbose output is sent to the host.
+            In this example, the function will search for all report groups, Verbose output is sent to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDashboardGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -LogPath log.txt
+            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -LogPath log.txt
 
-            In this example, the function will search for a dashboard group with "6" in the id property. Non-verbose output is sent to log.txt in the current directory.
+            In this example, the function will search for a report group with "6" in the id property. Non-verbose output is sent to log.txt in the current directory.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDashboardGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name 'SQL Dashboards'
+            PS C:\> Get-LogicMonitorReportGroup -AccessId <accessID> -AccessKey <accessKey> -AccountName <accountName> -Name "SQL Reports"
 
-            In this example, the function will search for a dashboard with "SQL Dashboards" in the name property. Non-verbose output is returned to the shell.
+            In this example, the function will search for a report with "SQL Reports" in the name property. Non-verbose output is returned to the shell.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDashboardGroup -AccessID <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=fullPath~"Acme Co"' -Verbose
+            PS C:\> Get-LogicMonitorReportGroup -AccessID <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=userPermission:"read"' -Verbose
 
-            In this example, the function gets the properties of dashboard groups with "Acme Co" in the full path property. Verbose output is sent to the host.
+            In this example, the function gets the properties of report groups with "Acme Co" in the full path property. Verbose output is sent to the host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllGroups')]
     Param (
@@ -83,18 +83,18 @@ Function Get-LogicMonitorDashboardGroup {
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Initialize variables.
-    $dashboardGroups = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
-    $singleDeviceCheckDone = $false # Controls when a Do loop exits, if we are getting a single dashboard group (by ID or name).
+    $reportGroups = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
+    $singleDeviceCheckDone = $false # Controls when a Do loop exits, if we are getting a single report group (by ID or name).
     $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all dashboard groups.
+    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all report groups.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $resourcePath = "/dashboard/groups"
+    $resourcePath = "/report/groups"
     $queryParams = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: Retrieving dashboard groups. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+    $message = ("{0}: Retrieving report groups. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Do {
@@ -170,7 +170,7 @@ Function Get-LogicMonitorDashboardGroup {
 
                     Return "Error"
                 } Else {
-                    $message = ("{0}: Unexpected error getting dashboard groups. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    $message = ("{0}: Unexpected error getting report groups. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
                         Error code: {3}`r
                         Invoke-Request: {4}`r
@@ -188,10 +188,10 @@ Function Get-LogicMonitorDashboardGroup {
         While ($stopLoop -eq $false)
 
         If ($firstLoopDone -and ($response.items.Count -gt 0)) {
-            $message = ("{0}: Found {1} more dashboard groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count)
+            $message = ("{0}: Found {1} more report groups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $dashboardGroups.AddRange([System.Collections.Generic.List[PSObject]]@($response.items))
+            $reportGroups.AddRange([System.Collections.Generic.List[PSObject]]@($response.items))
 
             If ($response.items.Count -eq 1) {
                 $stopLoop = $true
@@ -199,7 +199,7 @@ Function Get-LogicMonitorDashboardGroup {
                 $stopLoop = $false
             }
         } ElseIf ($firstLoopDone -and $response.id) {
-            $dashboardGroups = $response
+            $reportGroups = $response
 
             $stopLoop = $true
         } Else {
@@ -209,11 +209,11 @@ Function Get-LogicMonitorDashboardGroup {
             $stopLoop = $true
         }
 
-        $message = ("{0}: There are {1} dashboard groups in `$dashboardGroups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $dashboardGroups.id.Count)
+        $message = ("{0}: There are {1} report groups in `$reportGroups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $reportGroups.id.Count)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         If ($stopLoop -eq $false) {
-            # Increment offset, to grab the next batch of dashboard groups.
+            # Increment offset, to grab the next batch of report groups.
             $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
@@ -222,5 +222,5 @@ Function Get-LogicMonitorDashboardGroup {
     }
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
-    $dashboardGroups
+    $reportGroups
 } #1.0.0.2
