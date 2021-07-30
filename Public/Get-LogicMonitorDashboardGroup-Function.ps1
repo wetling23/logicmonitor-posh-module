@@ -8,6 +8,7 @@ Function Get-LogicMonitorDashboardGroup {
                 - Initial release
             V1.0.0.1 date: 23 July 2020
             V1.0.0.2 date: 10 June 2021
+            V1.0.0.3 date: 30 July 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -90,6 +91,9 @@ Function Get-LogicMonitorDashboardGroup {
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/dashboard/groups"
     $queryParams = $null
+    $pattern1 = '[^a-zA-Z\d\s]' # Match any non-alpha numeric or white space character.
+    $pattern2 = '(?:>:|<:|:|>|<|!:|:|~|!~)(?:")(.*?)(?:")' # Allow us to replace characters in the filter. We will leave some of the characters alone, since they are used by the API in certain spots. For example, ":" means equal between the property name and value but should be replaced in the value portion of the pair.
+    $regex = [Regex]::new($pattern2)
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
@@ -103,6 +107,18 @@ Function Get-LogicMonitorDashboardGroup {
                 $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
             }
             "StringFilter" {
+                If ($Filter -match $pattern1) {
+                    $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                    $regex.Matches($Filter) | ForEach-Object {
+                        $Filter = $Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value))
+                    }
+
+                    $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                }
+
                 $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
             }
             "AllGroups" {
@@ -223,4 +239,4 @@ Function Get-LogicMonitorDashboardGroup {
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
     $dashboardGroups
-} #1.0.0.2
+} #1.0.0.3

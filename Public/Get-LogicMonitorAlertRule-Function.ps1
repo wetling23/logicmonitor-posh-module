@@ -20,6 +20,7 @@
             V1.0.0.7 date: 4 December 2019
             V1.0.0.8 date: 23 July 2020
             V1.0.0.9 date: 20 May 2021
+            V1.0.0.10 date: 30 July 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -102,6 +103,9 @@
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/setting/alert/rules" # Define the resourcePath, based on the type of query you are doing.
     $queryParams = $null
+    $pattern1 = '[^a-zA-Z\d\s]' # Match any non-alpha numeric or white space character.
+    $pattern2 = '(?:>:|<:|:|>|<|!:|:|~|!~)(?:")(.*?)(?:")' # Allow us to replace characters in the filter. We will leave some of the characters alone, since they are used by the API in certain spots. For example, ":" means equal between the property name and value but should be replaced in the value portion of the pair.
+    $regex = [Regex]::new($pattern2)
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
@@ -112,6 +116,18 @@
                 $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
             }
             "StringFilter" {
+                If ($Filter -match $pattern1) {
+                    $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                    $regex.Matches($Filter) | ForEach-Object {
+                        $Filter = $Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value))
+                    }
+
+                    $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                }
+
                 $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
             }
             "AllAlertRules" {
@@ -232,4 +248,4 @@
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
     $alertRules
-} #1.0.0.9
+} #1.0.0.10

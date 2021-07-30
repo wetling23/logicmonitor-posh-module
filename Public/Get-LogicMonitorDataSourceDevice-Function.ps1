@@ -6,6 +6,7 @@ Function Get-LogicMonitorDataSourceDevice {
             Author: Mike Hashemi
             V1.0.0.0 date: 6 July 2021
                 -Initial release.
+            V1.0.0.1 date: 30 July 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -122,11 +123,6 @@ Function Get-LogicMonitorDataSourceDevice {
                     If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                     Start-Sleep -Seconds 60
-                } ElseIf ($_.ErrorDetails -match 'invalid filter') {
-                    $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
-
-                    Return "Error"
                 } Else {
                     $message = ("{0}: Unexpected error getting devices. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
@@ -181,4 +177,4 @@ Function Get-LogicMonitorDataSourceDevice {
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.0
+} #1.0.0.1

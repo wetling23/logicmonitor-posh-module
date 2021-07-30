@@ -7,6 +7,7 @@ Function Get-LogicMonitorDeviceGroup {
             Author: Mike Hashemi
             V1.0.0.0 date: 8 April 2021
                 - Initial release. Or maybe not, who knows.
+            V1.0.0.1 date: 30 July 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -90,12 +91,34 @@ Function Get-LogicMonitorDeviceGroup {
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/device/groups" # Define the resourcePath, based on the type of device you're searching for.
     $queryParams = $null
+    $pattern1 = '[^a-zA-Z\d\s]' # Match any non-alpha numeric or white space character.
+    $pattern2 = '(?:>:|<:|:|>|<|!:|:|~|!~)(?:")(.*?)(?:")' # Allow us to replace characters in the filter. We will leave some of the characters alone, since they are used by the API in certain spots. For example, ":" means equal between the property name and value but should be replaced in the value portion of the pair.
+    $regex = [Regex]::new($pattern2)
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     $message = ("{0}: The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+    If ($Name -and ($Name -match $pattern1)) {
+        $message = ("{0}: URL encoding special characters in the group name." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+        $Name = $Name.Replace('%', '%25').Replace('&', '%26').Replace('$', '%24').Replace('+', '%28').Replace(',', '%2C').Replace('/', '%2F').Replace(':', '%3A').Replace(';', '%3B').Replace('=', '%3D').Replace('?', '%3F').Replace('@', '%40').Replace(' ', '%20').Replace('"', '%22').Replace('<', '%3C').Replace('>', '%3E').Replace('#', '%23').Replace('{', '%7B').Replace('}', '%7D').Replace('|', '%7C').Replace('\', '%5C').Replace('^', '%5E').Replace('~', '%7E').Replace('[', '%5B').Replace(']', '%5D')
+    }
+
+    If ($Filter -match $pattern1) {
+        $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+        $regex.Matches($Filter) | ForEach-Object {
+            $Filter = $Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value))
+        }
+
+        $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    }
 
     Do {
         Switch ($PsCmdlet.ParameterSetName) {
@@ -225,4 +248,4 @@ Function Get-LogicMonitorDeviceGroup {
     Until (($stopLoop -eq $true) -or ($singleDeviceGroupCheckDone))
 
     $deviceGroups
-} #1.0.0.0
+} #1.0.0.1
