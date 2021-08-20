@@ -10,6 +10,7 @@ Function Get-LogicMonitorConfigSourceData {
             V1.0.0.1 date: 16 March 2021
             V1.0.0.2 date: 1 April 2021
             V1.0.0.3 date: 20 April 2021
+            V1.0.0.4 date: 19 August 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -387,7 +388,7 @@ Function Get-LogicMonitorConfigSourceData {
         $message = ("{0}: No applied ConfigSources found under the name `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $ConfigSourceName)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        Return
+        Return "No data"
     }
     ElseIf ($appliedConfigSources.items.id) {
         $message = ("{0}: Identified {1} applied ConfigSources. No ConfigSource filter provided, getting all instances." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedConfigSources.items.id.Count)
@@ -547,4 +548,4 @@ Function Get-LogicMonitorConfigSourceData {
         Return
     }
     #endregion Get data
-} #1.0.0.3
+} #1.0.0.4
