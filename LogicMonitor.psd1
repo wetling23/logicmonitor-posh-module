@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.1.78'
+    ModuleVersion     = '1.0.1.79'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -73,7 +73,7 @@
     'Get-LogicMonitorWebsiteProperty',
     'Out-PsLogging',
     'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector', 'Remove-LogicMonitorCollectorVersion',
-    'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorSdt',
+    'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt',
     'Send-LogicMonitorLmLogEntry',
     'Start-LogicMonitorDeviceSdt',
     'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty', 'Update-LogicMonitorCollectorProperty',
