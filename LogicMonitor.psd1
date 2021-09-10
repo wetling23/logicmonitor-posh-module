@@ -73,7 +73,7 @@
     'Get-LogicMonitorWebsiteProperty',
     'Out-PsLogging',
     'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector', 'Remove-LogicMonitorCollectorVersion',
-    'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorSdt',
+    'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt',
     'Send-LogicMonitorLmLogEntry',
     'Start-LogicMonitorDeviceSdt',
     'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty', 'Update-LogicMonitorCollectorProperty',
