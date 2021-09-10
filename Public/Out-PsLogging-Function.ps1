@@ -12,6 +12,7 @@ Function Out-PsLogging {
             V1.0.0.4 date: 15 June 2020
             V1.0.0.5 date: 30 June 2020
             V1.0.0.6 date: 8 April 2021
+            V1.0.0.7 date: 10 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -90,14 +91,14 @@ Function Out-PsLogging {
                 $logType = "EventLog"
             }
             Catch {
-                Write-Error ("{0}: Unable to create the event source ({1}). No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $EventLogSource)
+                Write-Error ("[ERROR] {0}: Unable to create the event source ({1}). No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $EventLogSource)
 
                 $logType = "SessionOnly"
             }
         }
         ElseIf (-NOT $elevatedSession) {
             # The event source does not exist, and the session is not elevated.
-            Write-Error ("{0}: The event source ({1}) does not exist and the command was not run in an elevated session, unable to create the event source. No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $EventLogSource)
+            Write-Error ("[ERROR] {0}: The event source ({1}) does not exist and the command was not run in an elevated session, unable to create the event source. No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $EventLogSource)
 
             $logType = "SessionOnly"
         }
@@ -108,7 +109,7 @@ Function Out-PsLogging {
             [System.Io.File]::OpenWrite($LogPath).Close()
         }
         Catch {
-            Write-Error ("{0}: Unable to write to the log file path ({1}). No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $LogPath)
+            Write-Error ("[ERROR] {0}: Unable to write to the log file path ({1}). No logging will be done." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $LogPath)
 
             $logType = "SessionOnly"
         }
@@ -122,20 +123,20 @@ Function Out-PsLogging {
     Switch ($logType) {
         "SessionOnly" {
             Switch ($MessageType) {
-                "Info" { Write-Host $Message }
-                "Warning" { Write-Warning $Message }
-                "Error" { If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
-                "Verbose" { Write-Verbose $Message -Verbose }
-                "First" { Write-Verbose $Message -Verbose }
+                "Info" { Write-Host "[INFO] $Message" }
+                "Warning" { Write-Warning "[WARNING] $Message" }
+                "Error" { If ($BlockStdErr) { Write-Host "[ERROR] $Message" -ForegroundColor Red } Else { Write-Error "[ERROR] $Message" } }
+                "Verbose" { Write-Verbose "[VERBOSE] $Message" -Verbose }
+                "First" { Write-Verbose "[INFO] $Message" -Verbose }
             }
         }
         "EventLog" {
             Switch ($MessageType) {
-                "Info" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Host $Message }
-                "Warning" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Warning -Message $Message -EventId 5417; Write-Warning $Message }
-                "Error" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message $Message -EventId 5417; If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
-                "Verbose" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
-                "First" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message $Message -EventId 5417; Write-Verbose $Message -Verbose }
+                "Info" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message "[INFO] $Message" -EventId 5417; Write-Host "[INFO] $Message" }
+                "Warning" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Warning -Message "[WARNING] $Message" -EventId 5417; Write-Warning "[WARNING] $Message" }
+                "Error" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Error -Message "[ERROR] $Message" -EventId 5417; If ($BlockStdErr) { Write-Host "[ERROR] $Message" -ForegroundColor Red } Else { Write-Error "[ERROR] $Message" } }
+                "Verbose" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message "[VERBOSE] $Message" -EventId 5417; Write-Verbose "[VERBOSE] $Message" -Verbose }
+                "First" { Write-EventLog -LogName Application -Source $EventLogSource -EntryType Information -Message "[INFO] $Message" -EventId 5417; Write-Verbose "[INFO] $Message" -Verbose }
             }
             If ($BlockStdErr) {
 
@@ -143,12 +144,12 @@ Function Out-PsLogging {
         }
         "LogFile" {
             Switch ($MessageType) {
-                "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Host $Message }
-                "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Warning $Message }
-                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); If ($BlockStdErr) { Write-Host $message -ForegroundColor Red } Else { Write-Error $Message } }
-                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]$Message, [Text.Encoding]::Unicode); Write-Verbose $Message -Verbose }
-                "First" { [System.IO.File]::WriteAllLines($LogPath, $Message, [Text.Encoding]::Unicode); Write-Verbose $Message -Verbose }
+                "Info" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]"[INFO] $Message", [Text.Encoding]::Unicode); Write-Host "[INFO] $Message" }
+                "Warning" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]"[WARNING] $Message", [Text.Encoding]::Unicode); Write-Warning "[WARNING] $Message" }
+                "Error" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]"[ERROR] $Message", [Text.Encoding]::Unicode); If ($BlockStdErr) { Write-Host "[ERROR] $Message" -ForegroundColor Red } Else { Write-Error "[ERROR] $Message" } }
+                "Verbose" { [System.IO.File]::AppendAllLines([string]$LogPath, [string[]]"[VERBOSE] $Message", [Text.Encoding]::Unicode); Write-Verbose "[VERBOSE] $Message" -Verbose }
+                "First" { [System.IO.File]::WriteAllLines($LogPath, "[INFO] $Message", [Text.Encoding]::Unicode); Write-Verbose "[INFO] $Message" -Verbose }
             }
         }
     }
-} #1.0.0.6
+} #1.0.0.7

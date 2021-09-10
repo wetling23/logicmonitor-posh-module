@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.79
+- Out-PsLogging
+  - Prepending [INFO], [WARNING], [ERROR], [VERBOSE] blocks before each message.
 ## 1.0.1.61
 - Get-LogicMonitorConfigSourceData
   - Instead of returning just the config content, the cmdlet now returns all of the instance properties.
