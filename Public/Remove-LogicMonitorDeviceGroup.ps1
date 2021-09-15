@@ -7,6 +7,7 @@ Function Remove-LogicMonitorDeviceGroup {
             V1.0.0.0 date: 1 September 2021
                 - Initial release.
             V1.0.0.1 date: 15 September 2021
+                - Update by Mike Hahsemi
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
