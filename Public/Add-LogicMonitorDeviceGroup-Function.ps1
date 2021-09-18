@@ -25,6 +25,9 @@
             V1.0.1.3 date: 18 October 2019
             V1.0.1.4 date: 4 December 2019
             V1.0.1.5 date: 23 July 2020
+            V1.0.1.6 date: 18 September 2021
+                - Update by Sven Borer
+                - Added explicit UTF-8 encoding to data sent to the server
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -122,6 +125,8 @@
     }
 
     $data = ($Properties | ConvertTo-Json)
+    $enc = [System.Text.Encoding]::UTF8
+    $encdata = $enc.GetBytes($data)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -151,7 +156,7 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
     }
     Catch {
         If ($_.Exception.Message -match '429') {
@@ -178,4 +183,4 @@
 
     $response
 }
-#1.0.1.5
+#1.0.1.6
