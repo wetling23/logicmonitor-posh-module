@@ -1,91 +1,62 @@
-﻿Function Add-LogicMonitorDevice {
+﻿Function Add-LogicMonitorDeviceGroup {
     <#
         .DESCRIPTION
-            Adds a monitored device to LogicMonitor. Note that the name (IP or DNS name) must be unique to the collector monitoring the device
-            and that the display name must be unique to LogicMonitor. Returns a success or failure string.
+            Create a new LogicMonitor device group.
         .NOTES
             Author: Mike Hashemi
-            V1 date: 24 January 2017
-            V1.0.0.1 date: 31 January 2017
-                - Added support for the hostGroupIds property.
-            V1.0.0.2 date: 31 January 2017
-                - Updated error output color.
-                - Streamlined header creation (slightly).
-            V1.0.0.3 date: 31 January 2017
-                - Added $logPath output to host.
-            V1.0.0.4 date: 31 January 2017
-                - Added additional logging.
-            V1.0.0.5 date: 2 February 2017
-                - Updated logging.
-                - Added support for multiple host group IDs.
-                - Added support for the device description field.
-            V1.0.0.6 date: 2 February 2017
-                - Updated logging.
-            V1.0.0.7 date: 10 February 2017
+            V1 date: 2 February 2017
+                - Initial release.
+            V1.0.0.3 date: 10 February 2017
                 - Updated procedure order.
-            V1.0.0.8 date: 3 May 2017
+            V1.0.0.4 date: 3 May 2017
                 - Removed code from writing to file and added Event Log support.
                 - Updated code for verbose logging.
                 - Changed Add-EventLogSource failure behavior to just block logging (instead of quitting the function).
-            V1.0.0.9 date: 21 June 2017
+            V1.0.0.5 date: 21 June 2017
                 - Updated logging to reduce chatter.
-            V1.0.0.10 date: 19 July 2017
-                - Updated handing the $data variable.
-            V1.0.0.11 date: 23 April 2018
+            V1.0.0.6 date: 23 April 2018
                 - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
                 - Replaced ! with -NOT.
-            V1.0.0.12 date: 13 March 2019
-                - Updated whitespace.
-            V1.0.1.0 date: 15 August 2019
+            V1.0.0.7 date: 21 June 2018
+                - Updated white space.
+            V1.0.1.0 date: 14 August 2019
             V1.0.1.1 date: 23 August 2019
             V1.0.1.2 date: 26 August 2019
             V1.0.1.3 date: 18 October 2019
             V1.0.1.4 date: 4 December 2019
             V1.0.1.5 date: 23 July 2020
+            V1.0.1.6 date: 18 September 2021
+                - Update by Sven Borer
+                - Added explicit UTF-8 encoding to data sent to the server
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER DeviceDisplayName
-            Mandatory parameter. Represents the display name of the device to be monitored. This name must be unique in your LogicMonitor account.
-        .PARAMETER DeviceName
-            Mandatory parameter. Represents the IP address or DNS name of the device to be monitored. This IP/name must be unique on the monitoring collector.
-        .PARAMETER PreferredCollectorID
-            Mandatory parameter. Represents the collector ID of the collector which will monitor the device.
-        .PARAMETER HostGroupID
-            Mandatory parameter. Represents the ID number of the group, into which the monitored device will be placed.
-        .PARAMETER Description
-            Represents the device description.
-        .PARAMETER PropertyNames
-            Mandatory parameter. Represents the name(s) of the target property. Note that LogicMonitor properties are case sensitive.
+        .PARAMETER Properties
+            Mandatory parameter. Represents the properties values of the new DeviceGroup. Required fields are "name" and "parentId". Valid properties can be found at https://www.logicmonitor.com/swagger-ui-master/dist/#/Device%20Groups/addDeviceGroup.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
-            When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
-        .PARAMETER LogPath
-            When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
+            Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
+        .PARAMETER BlockLogging
+            When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
-            PS C:\> $table = @{
-                        name = '10.1.1.2'
-                        displayName = 'server1'
-                        preferredCollectorId = '10'
-                    }
-            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose
+            PS C:\> $table = @{name = 'group1'; parentId = 1}
+            PS C:\> Add-LogicMonitorDeviceGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
-            In this example, the function will create a new device with the following properties:
-                - Name: 10.1.1.2
-                - Display name: server1
-                - Preferred collector ID: 10
+            In this example, the function will create a new DeviceGroup with the following properties:
+                - Name: group1
+                - Group ID of the parent: 1
             Verbose output is sent to the host.
         .EXAMPLE
             PS C:\> $table = @{
-                        name = '10.1.1.2'
-                        displayName = 'server1'
-                        preferredCollectorId = '10'
+                        name = 'group1'
+                        parentId = 1
+                        appliesTo = 'isLinux()'
                         customProperties = @(
                             @{
                                 name = 'testProperty'
@@ -93,12 +64,12 @@
                             }
                         )
                     }
-            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> Add-LogicMonitorDeviceGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
-            In this example, the function will create a new device with the following properties:
-                - Name: 10.1.1.2
-                - Display name: server1
-                - Preferred collector ID: 10
+            In this example, the function will create a new DeviceGroup with the following properties:
+                - Name: group1
+                - Group ID of the parent: 1
+                - Applies to: isLinux()
                 - Custom property name: testProperty
                 - Custom property value: someValue
             Verbose output is sent to the host.
@@ -129,31 +100,33 @@
 
     # Initialize variables.
     $httpVerb = "POST" # Define what HTTP operation will the script run.
-    $resourcePath = "/device/devices"
+    $resourcePath = "/device/groups"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     # Checking for the required properties
     If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('displayName'))) {
-        $message = ("{0}: No display name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+    If (-NOT($Properties.ContainsKey('parentId'))) {
+        $message = ("{0}: No parent DeviceGroup ID provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('preferredCollectorId'))) {
-        $message = ("{0}: No preferred collector ID provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+    If ($Properties.ContainsKey('customProperties') -and (-NOT($Properties.customProperties.ContainsKey('name')))) {
+        $message = ("{0}: Custom properties were supplied, but no name key was provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
 
     $data = ($Properties | ConvertTo-Json)
+    $enc = [System.Text.Encoding]::UTF8
+    $encdata = $enc.GetBytes($data)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -166,7 +139,7 @@
 
     # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes(([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey)))))
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
@@ -183,7 +156,7 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
     }
     Catch {
         If ($_.Exception.Message -match '429') {
@@ -193,7 +166,7 @@
             Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding device called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
                 Error message: {3}`r
                 Error code: {4}`r
                 Invoke-Request: {5}`r
@@ -209,4 +182,5 @@
     }
 
     $response
-} #1.0.1.5
+}
+#1.0.1.6
