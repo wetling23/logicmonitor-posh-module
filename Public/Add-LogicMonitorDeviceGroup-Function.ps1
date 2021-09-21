@@ -31,7 +31,7 @@
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName

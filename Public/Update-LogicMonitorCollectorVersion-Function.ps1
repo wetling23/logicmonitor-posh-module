@@ -15,6 +15,7 @@ Function Update-LogicMonitorCollectorVersion {
             V1.0.0.5 date: 4 December 2019
             V1.0.0.6 date: 10 December 2019
             V1.0.0.7 date: 23 July 2020
+            V1.0.0.8 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -182,7 +183,9 @@ Function Update-LogicMonitorCollectorVersion {
         $propertyData.Add("onetimeUpgradeInfo", $upgradeProperties)
 
         # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
-        $data = $propertyData | ConvertTo-Json -Depth 6
+        $data = ($propertyData | ConvertTo-Json -Depth 5)
+        $enc = [System.Text.Encoding]::UTF8
+        $encdata = $enc.GetBytes($data)
 
         $message = ("{0}: Finished updating `$data. The value update is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -215,7 +218,7 @@ Function Update-LogicMonitorCollectorVersion {
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
         }
         Catch {
             If ($_.Exception.Message -match '429') {
@@ -247,4 +250,4 @@ Function Update-LogicMonitorCollectorVersion {
 
         Return $response
     }
-} #1.0.0.7
+} #1.0.0.8

@@ -7,6 +7,7 @@
             V1.0.0.0 date: 27 February 2020
                 - Initial release.
             V1.0.0.1 date: 23 July 2020
+            V1.0.0.2 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -66,19 +67,24 @@
 
     # Checking for the required properties
     If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
-
-        Return "Error"
-    }
-    If (($Properties.GetEnumerator().Name | ForEach-Object { $_ -in 'name', 'description', 'userPermission' }) -eq 'False') {
-        $message = ("{0}: An invalid property was provided. Valid values are: name, description, and userPermission. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
 
-    $data = ($Properties | ConvertTo-Json)
+    Foreach ($propName in $Properties.GetEnumerator().Name) {
+        If ($propName -notin @('name', 'description', 'userPermission')) {
+            $message = ("{0}: Property, `"{1}`" is invalid. Valid values are: name, description, and userPermission. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+            Return "Error"
+        }
+    }
+
+    $data = ($Properties | ConvertTo-Json -Depth 5)
+    $enc = [System.Text.Encoding]::UTF8
+    $encdata = $enc.GetBytes($data)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -108,7 +114,7 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
     }
     Catch {
         If ($_.Exception.Message -match '429') {
@@ -135,4 +141,4 @@
 
     $response
 }
-#1.0.0.1
+#1.0.0.2

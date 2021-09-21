@@ -19,6 +19,7 @@ Function Start-LogicMonitorSDT {
             V1.0.0.4 date: 18 October 2019
             V1.0.0.5 date: 4 December 2019
             V1.0.0.6 date: 23 July 2020
+            V1.0.0.7 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -162,6 +163,9 @@ Function Start-LogicMonitorSDT {
             $data = "{`"sdtType`":1,`"type`":`"DeviceSDT`",`"deviceDisplayName`":`"$DisplayName`",`"startDateTime`":$sdtStart,`"endDateTime`":$sdtEnd,`"comment`":`"$Comment`"}"
         }
 
+        $enc = [System.Text.Encoding]::UTF8
+        $encdata = $enc.GetBytes($data)
+
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
@@ -179,17 +183,18 @@ Function Start-LogicMonitorSDT {
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
         # Construct Headers
-        $auth = 'LMv1 ' + $accessId + ':' + $signature + ':' + $epoch
-        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-        $headers.Add("Authorization", $auth)
-        $headers.Add("Content-Type", 'application/json')
-        
+        $headers = @{
+            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 2
+        }
+
         # Make Request
         $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
         }
         Catch {
             If ($_.Exception.Message -match '429') {
@@ -216,4 +221,4 @@ Function Start-LogicMonitorSDT {
 
         $response
     }
-} #1.0.0.6
+} #1.0.0.7

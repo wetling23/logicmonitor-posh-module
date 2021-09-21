@@ -6,6 +6,7 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 6 February 2021
             V1.0.0.1 date: 6 February 2021
+            V1.0.0.2 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -86,6 +87,8 @@
     }
 
     $data = ConvertTo-Json -InputObject $body
+    $enc = [System.Text.Encoding]::UTF8
+    $encdata = $enc.GetBytes($data)
 
     $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -122,7 +125,7 @@
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
 
             $stopLoop = $True
         } Catch {
@@ -161,4 +164,4 @@
 
             Return "Error"
     }
-} #1.0.0.1
+} #1.0.0.2

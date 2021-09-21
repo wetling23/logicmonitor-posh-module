@@ -26,6 +26,7 @@
             V1.0.0.11 date: 18 October 2019
             V1.0.0.12 date: 4 December 2019
             V1.0.0.13 date: 23 July 2020
+            V1.0.0.14 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -189,7 +190,9 @@
             }
         }
 
-        $data = ($data | ConvertTo-Json)
+        $data = ($data | ConvertTo-Json -Depth 5)
+        $enc = [System.Text.Encoding]::UTF8
+        $encdata = $enc.GetBytes($data)
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -220,7 +223,7 @@
 
         Do {
             Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -Body $data -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -Body $encdata -ErrorAction Stop
 
                 $stopLoop = $True
             }
@@ -251,4 +254,4 @@
 
         Return $response
     }
-} #1.0.0.13
+} #1.0.0.14

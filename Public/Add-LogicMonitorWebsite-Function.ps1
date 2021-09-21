@@ -1,56 +1,39 @@
-﻿Function Add-LogicMonitorWebsiteGroup {
+﻿Function Add-LogicMonitorWebsite {
     <#
         .DESCRIPTION
-            Create a new LogicMonitor website group.
+            Create a new LogicMonitor website.
         .NOTES
             Author: Mike Hashemi
-            V1.0.0.0 date: 27 February 2020
+            V1.0.0.0 date: 16 September 2021
                 - Initial release.
-            V1.0.0.1 date: 23 July 2020
-            V1.0.0.2 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Properties
-            Mandatory parameter. Represents the properties values of the new WebsiteGroup. Required fields are "name" and "parentId". Valid properties can be found at https://www.logicmonitor.com/swagger-ui-master/dist/#/Device%20Groups/addWebsiteGroup.
+            Mandatory parameter. Represents the properties values of the new DeviceGroup. Required fields are "name" and "parentId". Valid properties can be found at https://www.logicmonitor.com/swagger-ui-master/dist/#/Device%20Groups/addDeviceGroup.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
-            When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
-        .PARAMETER LogPath
-            When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
-        .EXAMPLE
-            PS C:\> $table = @{name = 'group1'; parentId = 1}
-            PS C:\> Add-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
-
-            In this example, the function will create a new WebsiteGroup with the following properties:
-                - Name: group1
-                - Group ID of the parent: 1
-            Limited output is sent to the host.
+            Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
+        .PARAMETER BlockLogging
+            When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
         .EXAMPLE
             PS C:\> $table = @{
-                        name = 'group1'
-                        parentId = 1
-                        customProperties = @(
-                            @{
-                                name = 'testProperty'
-                                value = 'someValue'
-                            }
-                        )
+                        name   = "site1"
+                        type   = "webcheck"
+                        domain = "www.google.com"
+                        steps  = @([PSCustomObject]@{
+                            url = "/"
+                        })
                     }
-            PS C:\> Add-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
+            PS C:\> Add-LogicMonitorWebsite -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
-            In this example, the function will create a new WebsiteGroup with the following properties:
-                - Name: group1
-                - Group ID of the parent: 1
-                - Custom property name: testProperty
-                - Custom property value: someValue
-            Verbose output is sent to the host and to log.txt in the current directory.
+            In this example, the function will create a new Website monitor to webcheck www.google.com. Limited logging is written only to the host.
     #>
     [CmdletBinding()]
     Param (
@@ -77,26 +60,33 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Initialize variables.
+    $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding
     $httpVerb = "POST" # Define what HTTP operation will the script run.
-    $resourcePath = "/website/groups"
+    $resourcePath = "/website/websites"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
     # Checking for the required properties
     If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No group name provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No site name provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('parentId'))) {
-        $message = ("{0}: No parent WebsiteGroup ID provided. Please update the provided properties and re-submit the request.")
+    If (-NOT($Properties.ContainsKey('type'))) {
+        $message = ("{0}: No check type provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
-    If ($Properties.ContainsKey('customProperties') -and (-NOT($Properties.customProperties.ContainsKey('name')))) {
-        $message = ("{0}: Custom properties were supplied, but no name key was provided. Please update the provided properties and re-submit the request.")
+    If (-NOT($Properties.ContainsKey('domain'))) {
+        $message = ("{0}: No domain name provided. Please update the provided properties and re-submit the request.")
+        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+        Return "Error"
+    }
+    If (-NOT($Properties.ContainsKey('steps'))) {
+        $message = ("{0}: No steps provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
@@ -144,7 +134,7 @@
             Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding WebsiteGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
                 Error message: {3}`r
                 Error code: {4}`r
                 Invoke-Request: {5}`r
@@ -161,4 +151,4 @@
 
     $response
 }
-#1.0.0.2
+#1.0.0.0

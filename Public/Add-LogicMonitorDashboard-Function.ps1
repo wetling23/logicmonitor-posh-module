@@ -9,6 +9,7 @@
             V1.0.0.1 date: 2 March 2021
             V1.0.0.2 date: 2 March 2021
             V1.0.0.3 date: 16 March 2021
+            V1.0.0.4 date: 21 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -40,12 +41,16 @@
                         description = 'This is a test dashboard.'
                         sharable = $true
                         widgetTokens = @(
-                            @{
-                                name = 'defaultDeviceGroup'
-                                value = 'Devices by Type/Network'
-                                name = 'defaultServiceGroup'
-                                value = 'West coast'
-                            }
+                            @(
+                                [PSCustomObject]@{
+                                    name  = 'defaultDeviceGroup'
+                                    value = 'Devices by Type/Network'
+                                },
+                                [PSCustomObject]@{
+                                    name  = 'defaultServiceGroup'
+                                    value = 'West coast'
+                                }
+                            )
                         )
                     }
             PS C:\> Add-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
@@ -97,6 +102,8 @@
     }
 
     $data = ($Properties | ConvertTo-Json -Depth 5)
+    $enc = [System.Text.Encoding]::UTF8
+    $encdata = $enc.GetBytes($data)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
@@ -126,7 +133,7 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
     }
     Catch {
         If ($_.Exception.Message -match '429') {
@@ -153,4 +160,4 @@
 
     $response
 }
-#1.0.0.3
+#1.0.0.4
