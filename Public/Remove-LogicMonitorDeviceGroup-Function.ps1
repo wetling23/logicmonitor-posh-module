@@ -8,6 +8,7 @@ Function Remove-LogicMonitorDeviceGroup {
                 - Initial release.
             V1.0.0.1 date: 15 September 2021
                 - Update by Mike Hahsemi
+            V1.0.0.2 date: 30 September 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -21,7 +22,7 @@ Function Remove-LogicMonitorDeviceGroup {
         .PARAMETER HardDelete
             When this switch is included, the command will permanently delete the device group. The default behavior moves the device group to "Recently Delete", from which it can be recovered.
         .PARAMETER KeepChildren
-            When this switch is included, the command will delete the specified group and will move any child groups, under root. The default behavior deletes children too.
+            When this switch is included, the command will delete the specified group, its children, but resources in the group(s) will not be deleted. Any resources located in the specified group (or sub-groups) will remainin in other configured groups (e.g. dynamic groups). If a resource is a member of only a deleted group, it will be placed in the root group. The default behavior of this command is to delete resources.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
@@ -127,7 +128,7 @@ Function Remove-LogicMonitorDeviceGroup {
 
         # Construct Headers
         $headers = @{
-            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
             "X-Version"     = 2
         }
@@ -161,4 +162,4 @@ Function Remove-LogicMonitorDeviceGroup {
 
         $response
     }
-} #1.0.0.1
+} #1.0.0.2
