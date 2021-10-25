@@ -21,6 +21,7 @@
             V1.0.0.9 date: 4 December 2019
             V1.0.0.10 date: 23 July 2020
             v1.0.0.11 date: 25 September 2020
+            v1.0.0.12 date: 25 October 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -72,9 +73,11 @@
         [string]$AccountName,
 
         [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'Filter')]
         [datetime]$StartDate,
 
         [Parameter(ParameterSetName = 'Default')]
+        [Parameter(ParameterSetName = 'Filter')]
         [datetime]$EndDate,
 
         [Parameter(ParameterSetName = 'AllAlerts')]
@@ -274,4 +277,4 @@
     #endregion Main
 
     Return $alerts
-} #1.0.0.11
+} #1.0.0.12

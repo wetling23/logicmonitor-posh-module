@@ -16,6 +16,7 @@
             V1.0.0.5 date: 18 October 2019
             V1.0.0.6 date: 4 December 2019
             V1.0.0.7 date: 23 July 2020
+            V1.0.0.8 date: 22 October 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -95,6 +96,7 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Initialize variables.
+    $configSources = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
     [int]$currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
     [int]$offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
     [int]$ConfigSourceBatchCount = 1 # Define how many times we need to loop, to get all ConfigSources.
@@ -102,7 +104,6 @@
     [string]$httpVerb = "GET" # Define what HTTP operation will the script run.
     [string]$resourcePath = "/setting/configsources" # Define the resourcePath.
     $queryParams = $null
-    $configSources = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
@@ -275,7 +276,12 @@
                 $message = ("{0}: Entering switch statement for single-ConfigSource retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                $configSources = $response.items
+                If ($response.items) {
+                    $configSources.Add($response.items)
+                }
+                Else {
+                    $configSources.Add($response)
+                }
 
                 $message = ("{0}: There are {1} ConfigSources in `$ConfigSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($configSources.count))
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -290,12 +296,20 @@
                     $message = ("{0}: Found a single ConfigSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $configSources = $response.items
+                    If ($response.items) {
+                        $configSources.Add($response.items)
+                    } Else {
+                        $configSources.Add($response)
+                    }
 
                     Return $configSources
                 }
                 Else {
-                    $configSources += $response.items
+                    If ($response.items) {
+                        $configSources.Add($response.items)
+                    } Else {
+                        $configSources.Add($response)
+                    }
 
                     $message = ("{0}: There are {1} ConfigSources in `$configSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($configSources.count))
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -324,4 +338,4 @@
     }
 
     Return $configSources
-} #1.0.0.7
+} #1.0.0.8
