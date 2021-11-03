@@ -22,6 +22,8 @@
             V1.0.0.10 date: 23 July 2020
             v1.0.0.11 date: 25 September 2020
             v1.0.0.12 date: 25 October 2021
+            V1.0.0.13 date: 26 October 2021
+            V1.0.0.14 date: 1 November 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -83,8 +85,7 @@
         [Parameter(ParameterSetName = 'AllAlerts')]
         [switch]$All,
 
-        [Parameter(Mandatory, ParameterSetName = 'Filter')]
-        [hashtable]$Filter,
+        [string]$Filter,
 
         [int]$BatchSize = 1000,
 
@@ -105,7 +106,6 @@
     [boolean]$firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all alerts.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/alert/alerts" # Define the resourcePath.
-    $hashstr = $null # Filter as a string.
     $alerts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the alerts.
     $response = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
@@ -114,13 +114,41 @@
 
     $message = ("{0}: Converting/setting start/end date to seconds since epoch." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
+    write-host $message
+    #region Parsing dates
+    If ($Filter -and ($Filter -match 'startEpoch|endEpoch')) {
+        # Nothing to do, we will use the user-provided epochs for filtering.
+        $message = ("{0}: Using the start and end epochs specified in the Filter parameter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    }
+    ElseIf ($Filter) {
+        $message = ("{0}: Filter is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filter)
+        Write-Host $message
+    }
 
-    If ($StartDate -and -NOT($EndDate)) {
+    $message = ("{0}: Start date: {1} and End date: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $EndDate)
+    Write-Host $message
+
+
+    If (-NOT($StartDate) -and -NOT($EndDate)) {
+        $message = ("{0}: No start or end epoch specified, defaulting to the past five years (or as far back as the alerts go)." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+        [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
+        [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
+    }
+    ElseIf ($StartDate -and -NOT($EndDate)) {
+        $message = ("{0}: End epoch not specified, defaulting to the current time." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
         [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
     }
     ElseIf (-NOT($StartDate -and $EndDate)) {
-        # No start date, defaulting to last day.
+        $message = ("{0}: Start epoch not specified, defaulting to the past day." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
         [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddDays(-1)).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
     }
@@ -129,62 +157,38 @@
         [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
     }
     ElseIf ($PsCmdlet.ParameterSetName -eq "AllAlerts") {
+        $message = ("{0}: Attempting to get as many alerts as possible." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
         # Same action as "no date" but left here for backwards compatibility. Defaulting to all alerts in the last five years (or as far back as the alerts go).
         [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
     }
-    Else {
-        # No date, defaulting to all alerts in the last five years (or as far back as the alerts go).
-        [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-    }
+    $message = ("{0}: Start date: {1} and End date: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $EndDate)
+    Write-Host $message
+
+    $time = "startEpoch%3E%3A%22$StartDate%22%2CstartEpoch%3C%3A%22$EndDate%22"
+    #endregion Parsing dates
 
     If ($Filter) {
-        $message = ("{0}: Checking filter for invalid keys." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-        Foreach ($key in $($Filter.keys)) {
-            If ($key -notin 'id', 'type', 'acked', 'rule', 'chain', 'severity', 'cleared', 'sdted', 'monitorObjectName', 'monitorObjectGroups', 'resourceTemplateName', 'instanceName', 'dataPointName') {
-                $message = ("{0}: Unable to filter by {1}, removing the entry." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $key)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                $filter.remove($key)
-            }
-        }
-
         $message = ("{0}: Converting special characters to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        Foreach ($clone in ($Filter.Clone()).Keys) {
-            $filter.$clone = ($filter.$clone).Replace('"', '%2522')
-            $filter.$clone = ($filter.$clone).Replace('&', '%26')
-            $filter.$clone = ($filter.$clone).Replace("`r`n", "`n")
-            $filter.$clone = ($filter.$clone).Replace('#', '%23')
-            $filter.$clone = ($filter.$clone).Replace("`n", '%0A')
-            $filter.$clone = ($filter.$clone).Replace(')', '%29')
-            $filter.$clone = ($filter.$clone).Replace('(', '%28')
-            $filter.$clone = ($filter.$clone).Replace('>', '%3E')
-            $filter.$clone = ($filter.$clone).Replace('<', '%3C')
-            $filter.$clone = ($filter.$clone).Replace('/', '%2F')
-            $filter.$clone = ($filter.$clone).Replace(',', '%2C')
-            $filter.$clone = ($filter.$clone).Replace('*', '%2A')
-            $filter.$clone = ($filter.$clone).Replace('!', '%21')
-            $filter.$clone = ($filter.$clone).Replace('=', '%3D')
-            $filter.$clone = ($filter.$clone).Replace('~', '%7E')
-            $filter.$clone = ($filter.$clone).Replace(' ', '%20')
-            $filter.$clone = ($filter.$clone).Replace('|', '%7C')
-            $filter.$clone = ($filter.$clone).Replace('$', '%24')
-            $filter.$clone = ($filter.$clone).Replace('\', '%5C')
-            $filter.$clone = ($filter.$clone).Replace('_', '%5F')
+        Switch ($Filter) {
+            { $_.Contains('&') } { $Filter = $Filter.Replace('&', "%26") }
+            { $_.Contains('#') } { $Filter = $Filter.Replace('#', "%23") }
+            { $_.Contains(')') } { $Filter = $Filter.Replace(')', "%29") }
+            { $_.Contains('(') } { $Filter = $Filter.Replace('(', "%28") }
+            { $_.Contains('/') } { $Filter = $Filter.Replace('/', "%2F") }
+            { $_.Contains('*') } { $Filter = $Filter.Replace('*', "%2A") }
+            { $_.Contains(' ') } { $Filter = $Filter.Replace(' ', "%20") }
+            { $_.Contains('|') } { $Filter = $Filter.Replace('|', "%7C") }
+            { $_.Contains('$') } { $Filter = $Filter.Replace('$', "%24") }
+            { $_.Contains('\') } { $Filter = $Filter.Replace('\', "%5C") }
+            { $_.Contains('_') } { $Filter = $Filter.Replace('_', "%5F") }
         }
 
-        $message = ("{0}: Converting the filter hashtable to a string." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-        foreach ($key in $($filter.keys)) {
-            $hashstr += $key + ":" + "`"$($filter[$key])`"" + ","
-        }
-        $hashstr = ($hashstr.trimend(',')).Replace("`"", "%22")
+        $Filter = $Filter -replace "^filter="
     }
     #endregion Setup
 
@@ -193,11 +197,11 @@
         $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        If ($hashstr) {
-            $queryParams = "?filter=startEpoch%3E%3A%22$StartDate%22%2CstartEpoch%3C%3A%22$EndDate%22,$hashstr&sort=startEpoch&&offset=$offset&size=$BatchSize"
+        If ($Filter) {
+            $queryParams = "?filter=$Filter,$time&sort=startEpoch&offset=$offset&size=$BatchSize"
         }
         Else {
-            $queryParams = "?filter=startEpoch%3E%3A%22$StartDate%22%2CstartEpoch%3C%3A%22$EndDate%22&sort=startEpoch&&offset=$offset&size=$BatchSize"
+            $queryParams = "?filter=$time&sort=startEpoch&offset=$offset&size=$BatchSize"
         }
 
         # Construct the query URL.
@@ -277,4 +281,4 @@
     #endregion Main
 
     Return $alerts
-} #1.0.0.12
+} #1.0.0.14
