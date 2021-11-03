@@ -24,6 +24,7 @@
             v1.0.0.12 date: 25 October 2021
             V1.0.0.13 date: 26 October 2021
             V1.0.0.14 date: 1 November 2021
+            V1.0.0.15 date: 3 November 2021
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -55,11 +56,11 @@
 
             In this example, the cmdlet gets all alerts (up to the API maximum) going back as far as five years (or the maximum duration of available alerts). Verbose output is sent to the session host only.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter @{severity = "2"; cleared = "false"} -StartDate (Get-Date -Month 1 -Day 1)
+            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter 'filter=severity:2,cleared:"false"' -StartDate (Get-Date -Month 1 -Day 1)
 
             In this example, the cmdlet gets all open alerts (up to the API maximum) at the warning threshold, beginning on January 1 and ending on the current date. Limited logging output is sent to the session host only.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter @{severity = "2"; cleared = "false"} -EndDate (Get-Date).AddHours(-1) -Verbose -LogPath C:\Temp\log.txt
+            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter 'filter=severity:2,cleared:"false"'-EndDate (Get-Date).AddHours(-1) -Verbose -LogPath C:\Temp\log.txt
 
             In this example, the cmdlet gets all open alerts (up to the API maximum) at the warning threshold, beginning one day ago and ending one hour ago. Verbose logging output is sent to the session host and C:\Temp\log.txt
     #>

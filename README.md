@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.1.84
+- Get-LogicMonitorAlert
+  - Changed the format of the data accepted by the Filter parameter. Instead of accepting a hashtable of limited properties, the cmdlet now accepts a string formatted like, "filter=...".
 ## 1.0.1.79
 - Out-PsLogging
   - Prepending [INFO], [WARNING], [ERROR], [VERBOSE] blocks before each message.
