@@ -1,7 +1,7 @@
 ﻿Function Update-LogicMonitorConfigSource {
     <#
         .DESCRIPTION
-            Accept a 
+            Accept a ConfigSource ID and a hashtable of properties. Update the desired ConfigSource with the provided properties.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 22 October 2021
@@ -138,3 +138,20 @@
 
     Return $response
 } #1.0.0.0
+
+$PropertyTable = @{
+    configChecks = @(
+        [PSCustomObject]@{
+            id                 = 15587
+            description        = "The configuration file has changed."
+            configSourceId     = 29429432
+            alertLevel         = 2
+            ackClearAlert      = "True"
+            alertEffectiveIval = 30
+            alertTransitionInterval = 0
+            type = "ignore"
+            script = "@{format=arbitrary;diff_check=}"
+        }
+    )
+}
+

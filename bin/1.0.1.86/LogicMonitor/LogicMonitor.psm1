@@ -9156,6 +9156,7 @@ Function Get-LogicMonitorSdt {
             V1.0.0.8 date: 4 December 2019
             V1.0.0.9 date: 23 July 2020
             V1.0.0.10 date: 2 October 2020
+            V2022.02.21.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -9427,7 +9428,7 @@ Function Get-LogicMonitorSdt {
 
             $sdts.AddRange($response)
 
-            $message = ("{0}: Executed REST query. There are {1} entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $alerts.Count)
+            $message = ("{0}: Executed REST query. There are {1} entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $sdts.id.Count)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $offset += $BatchSize
@@ -9436,7 +9437,7 @@ Function Get-LogicMonitorSdt {
 
         Return $sdts
     }
-} #1.0.0.10
+} #V2022.02.21.0
 Function Get-LogicMonitorServiceProperty {
     <#
         .DESCRIPTION
@@ -14484,3 +14485,4 @@ Function Update-LogicMonitorWebsiteProperty {
 
     Return $response
 } #1.0.0.10
+Export-ModuleMember -Alias * -Function *
