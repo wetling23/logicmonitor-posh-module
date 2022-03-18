@@ -5744,6 +5744,7 @@ Function Get-LogicMonitorDevice {
             V1.0.1.26 date: 1 December 2020
             V1.0.0.27 date: 30 July 2021
             V2022.03.18.0
+            V2022.03.18.1
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -5966,13 +5967,14 @@ Function Get-LogicMonitorDevice {
         }
         While ($stopLoop -eq $false)
 
-        If ($firstLoopDone -and ($response.items.Id.Count -gt 0)) {
-            $message = ("{0}: Found {1} more devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count)
+        If ($response.items.id.Count -gt 0) {
+            $message = ("{0}: Retrieved {1} (more) devices (out of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.id.Count, $response.total)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $devices.AddRange([System.Collections.Generic.List[PSObject]]@($response.items))
         } ElseIf ($firstLoopDone -and $response.id) {
             $devices = $response
+            $singleDeviceCheckDone = $true
         } Else {
             $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -5981,7 +5983,7 @@ Function Get-LogicMonitorDevice {
         $message = ("{0}: There are {1} devices in `$devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $devices.id.Count)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        If ($stopLoop -eq $false) {
+        If ($stopLoop -eq $true) {
             # Increment offset, to grab the next batch of devices.
             $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
@@ -5992,7 +5994,7 @@ Function Get-LogicMonitorDevice {
     Until (($devices.id.Count -ge $response.total) -or ($singleDeviceCheckDone))
 
     $devices
-} #V2022.03.18.0
+} #V2022.03.18.1
 Function Get-LogicMonitorDeviceDataSource {
     <#
         .DESCRIPTION
