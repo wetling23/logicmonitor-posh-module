@@ -18,6 +18,7 @@
             V1.0.0.25 date: 25 November 2020
             V1.0.1.26 date: 1 December 2020
             V1.0.0.27 date: 30 July 2021
+            V2022.03.18.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -194,7 +195,7 @@
             $headers = @{
                 "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
-                "X-Version"     = 2
+                "X-Version"     = 3
             }
         }
 
@@ -240,26 +241,16 @@
         }
         While ($stopLoop -eq $false)
 
-        If ($firstLoopDone -and ($response.items.Count -gt 0)) {
+        If ($firstLoopDone -and ($response.items.Id.Count -gt 0)) {
             $message = ("{0}: Found {1} more devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $devices.AddRange([System.Collections.Generic.List[PSObject]]@($response.items))
-
-            If ($response.items.Count -eq 1) {
-                $stopLoop = $true
-            } Else {
-                $stopLoop = $false
-            }
         } ElseIf ($firstLoopDone -and $response.id) {
             $devices = $response
-
-            $stopLoop = $true
         } Else {
             $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-            $stopLoop = $true
         }
 
         $message = ("{0}: There are {1} devices in `$devices." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $devices.id.Count)
@@ -273,7 +264,7 @@
             $offset += $BatchSize
         }
     }
-    Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
+    Until (($devices.id.Count -ge $response.total) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.27
+} #V2022.03.18.0
