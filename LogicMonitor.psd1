@@ -115,7 +115,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Added Disable-DataSourceInstance and Enable-DataSourceInstance.'
+            ReleaseNotes = 'Updated Disable-DataSourceInstance to V2022.05.04.1 (fixed property name).'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''

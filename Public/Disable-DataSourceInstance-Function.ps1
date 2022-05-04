@@ -8,6 +8,7 @@ Function Disable-DataSourceInstance {
             V2022.05.03.0
             V2022.05.03.1
             V2022.05.04.0
+            V2022.05.04.1
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -240,12 +241,12 @@ Function Disable-DataSourceInstance {
 
                         If ($AlertingOnly) {
                             $body = @{
-                                disableAlerting   = $true
+                                disableAlerting = $true
                             } | ConvertTo-Json -Compress
                         } Else {
                             $body = @{
-                                disableAlerting   = $true
-                                disableMonitoring = $true
+                                disableAlerting = $true
+                                stopMonitoring  = $true
                             } | ConvertTo-Json -Compress
                         }
 
