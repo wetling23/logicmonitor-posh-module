@@ -1,10 +1,11 @@
-Function Enable-DataSourceInstance {
+Function Enable-LogicMonitorDataSourceInstance {
     <#
         .DESCRIPTION
             Accepts a comma-separated list of DataSources to Enable (-EnableDataSourceName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
         .NOTES
             Author: Mike Hashemi
             V2022.05.04.0
+            V2022.06.09.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -45,6 +46,7 @@ Function Enable-DataSourceInstance {
             In this example, the cmdlet will Enable all instances of the snmp64_if- DataSource, that do not match the filter (any instance where the description is not like "camera" or "uplink"). Verbose output is sent to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Enable-DataSourceInstance')]
     param (
         [Parameter(Mandatory)]
         [string]$AccessId,

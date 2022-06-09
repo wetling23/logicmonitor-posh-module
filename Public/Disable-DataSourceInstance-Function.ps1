@@ -1,4 +1,4 @@
-Function Disable-DataSourceInstance {
+Function Disable-LogicMonitorDataSourceInstance {
     <#
         .DESCRIPTION
             Accepts a comma-separated list of DataSources to disable (-DisableDataSourceName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
@@ -9,6 +9,7 @@ Function Disable-DataSourceInstance {
             V2022.05.03.1
             V2022.05.04.0
             V2022.05.04.1
+            V2022.06.09.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -49,6 +50,7 @@ Function Disable-DataSourceInstance {
             In this example, the cmdlet will disable all instances of the snmp64_if- DataSource, that do not match the filter (any instance where the description is not like "camera" or "uplink"). Verbose output is sent to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [alias('Disable-DataSourceInstance')]
     param (
         [Parameter(Mandatory)]
         [string]$AccessId,
