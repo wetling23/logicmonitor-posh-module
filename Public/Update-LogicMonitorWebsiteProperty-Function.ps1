@@ -18,6 +18,7 @@
             V1.0.0.8 date: 23 July 2020
             V1.0.0.9 date: 19 October 2020
             V1.0.0.10 date: 21 September 2021
+            V1.0.0.11 date: 20 June 2022
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -37,7 +38,7 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -websiteId 6 -PropertyTable @{"name"="newName"} -Verbose
+            PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyTable @{"name"="newName"} -Verbose
 
             In this example, the command will change the name of the website with id 6, to 'newName'. Verbose output is sent to the host.
         .EXAMPLE
@@ -82,6 +83,7 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    #region Logging
     # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
@@ -121,6 +123,7 @@
             }
         }
     }
+    #endregion Logging
 
     # Update $resourcePath to filter for a specific website, when a website ID or website name is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
@@ -152,7 +155,7 @@
 
     # Get current time in milliseconds
     $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-    y
+
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
 
@@ -167,7 +170,7 @@
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
 
     # Make Request
@@ -201,4 +204,4 @@
     }
 
     Return $response
-} #1.0.0.10
+} #1.0.0.11
