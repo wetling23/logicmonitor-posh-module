@@ -5,47 +5,7 @@
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 12 December 2016
-            V1.0.0.1 date: 31 January 2017
-                - Updated syntax and logging.
-                - Improved error handling.
-            V1.0.0.2 date: 31 January 2017
-                - Updated error output color.
-                - Streamlined header creation (slightly).
-            V1.0.0.3 date: 31 January 2017
-                - Added $logPath output to host.
-            V1.0.0.4 date: 31 January 2017
-                - Added additional logging.
-            V1.0.0.5 date: 10 February 2017
-                - Updated procedure order.
-            V1.0.0.6 date: 3 May 2017
-                - Removed code from writing to file and added Event Log support.
-                - Updated code for verbose logging.
-                - Changed Add-EventLogSource failure behavior to just block logging (instead of quitting the function).
-            V1.0.0.7 date: 21 June 2017
-                - Updated logging to reduce chatter.
-            V1.0.0.8 date: 12 July 2017
-                - Added -EventLogSource to a couple of cmdlet calls.
-            V1.0.0.9 date: 1 August 2017
-                - Updated inline documentation.
-            V1.0.0.10 date: 28 September 2017
-                - Replaced ! with -Not.
-            V1.0.0.11 date: 23 April 2018
-                - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
-            V1.0.0.12 date: 11 July 2018
-                - Updated white space.
-                - Updated in-line help.
-            V1.0.0.13 date: 18 July 2018
-                - More whites space updates.
-                - Added the API's response to the return data when there is an Invoke-RestMethod failure.
-            V1.0.0.14 date: 18 March 2019
-                - Updated alias publishing method.
-            V1.0.0.15 date: 23 August 2019
-            V1.0.0.16 date: 26 August 2019
-            V1.0.0.17 date: 18 October 2019
-            V1.0.0.18 date: 4 December 2019
-            V1.0.0.19 date: 10 December 2019
-            V1.0.0.20 date: 23 July 2020
-            V1.0.0.21 date: 21 September 2021
+            V2022.10.24.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -86,7 +46,7 @@
             In this example, the function will update the Location property for the device with "server1.domain.local" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
-    [alias('Get-LogicMonitorDeviceProperties')]
+    [alias('Update-LogicMonitorDeviceProperties')]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -125,7 +85,7 @@
     $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    # Initialize variables.
+    #region Initialize variables
     [int]$index = 0
     $propertyData = ""
     $standardProperties = ""
@@ -135,47 +95,46 @@
     $resourcePath = "/device/devices"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    #endregion Initialize variables
 
+    #region Logging splatting
     # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
                 Verbose        = $true
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 Verbose = $true
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
+        } Else {
+            $loggingParams = @{
                 Verbose = $true
             }
         }
-    }
-    Else {
+    } Else {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
                 Verbose        = $false
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 Verbose = $false
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
+        } Else {
+            $loggingParams = @{
                 Verbose = $false
             }
         }
     }
+    #endregion Logging splatting
 
+    #region Set resource path
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
@@ -185,7 +144,7 @@
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DisplayName)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @commandParams
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @loggingParams
 
             $resourcePath += "/$($device.id)"
 
@@ -196,7 +155,7 @@
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @loggingParams
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
@@ -215,8 +174,11 @@
 
     $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #endregion Set resource path
 
+    #region Parse properties
     # For each property, assign the name and value to $propertyData.
+    $PropertyValues = $PropertyValues.Replace('\', '\\')
     Foreach ($property in $PropertyNames) {
         Switch ($property) {
             { $_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId") } {
@@ -241,8 +203,7 @@
                 If ($property -like "*pass") {
                     $message = ("{0}: Updating/adding property: {1} with a value of ********." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-                Else {
+                } Else {
                     $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property, $($PropertyValues[$index]))
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
@@ -256,8 +217,7 @@
 
     If ($customProps -eq $True) {
         $queryParams += "customProperties&opType=replace"
-    }
-    Else {
+    } Else {
         $queryParams = $queryParams.TrimEnd(",")
         $queryParams += "&opType=replace"
     }
@@ -273,15 +233,15 @@
 
         # Assign the entire string to the $data variable.
         $data = "{$standardProperties,`"customProperties`":[$propertyData]}"
-    }
-    ElseIf (($standardProperties.Length -gt 0) -and ($propertyData.Length -le 0)) {
+    } ElseIf (($standardProperties.Length -gt 0) -and ($propertyData.Length -le 0)) {
         $data = "{$standardProperties}"
-    }
-    Else {
+    } Else {
         # Assign the entire string to the $data variable.
         $data = "{`"customProperties`":[$propertyData]}"
     }
+    #endregion Parse properties
 
+    #region REST auth
     $enc = [System.Text.Encoding]::UTF8
     $encdata = $enc.GetBytes($data)
 
@@ -292,7 +252,7 @@
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
     # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
@@ -309,22 +269,21 @@
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
     }
+    #endregion REST auth
 
-    # Make Request
+    #region REST command
     $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
-    }
-    Catch {
+    } Catch {
         If ($_.Exception.Message -match '429') {
             $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
             Start-Sleep -Seconds 60
-        }
-        Else {
+        } Else {
             $message = ("{0}: Unexpected error updating LogicMonitor device property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
             Error message: {2}`r
             Error code: {3}`r
@@ -339,6 +298,7 @@
             Return "Error", $response
         }
     }
+    #endregion REST command
 
     If ($response.status -ne "200") {
         $message = ("{0}: LogicMonitor reported an error (status {1}). The message is: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
@@ -346,4 +306,4 @@
     }
 
     Return $response
-} #1.0.0.21
+} #2022.10.24.0
