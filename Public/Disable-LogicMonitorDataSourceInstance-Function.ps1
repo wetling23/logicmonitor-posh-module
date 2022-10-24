@@ -1,7 +1,7 @@
-Function Disable-LogicMonitorDataSourceInstance {
+Function Disable-LogicMonitorLogicModuleInstance {
     <#
         .DESCRIPTION
-            Accepts a comma-separated list of DataSources to disable (-DisableDataSourceName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
+            Accepts a comma-separated list of LogicModules to disable (-LogicModuleName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
         .NOTES
             Author: Mike Hashemi
             V2022.05.02.0
@@ -10,6 +10,7 @@ Function Disable-LogicMonitorDataSourceInstance {
             V2022.05.04.0
             V2022.05.04.1
             V2022.06.09.0
+            V2022.09.29.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -22,8 +23,8 @@ Function Disable-LogicMonitorDataSourceInstance {
             Represents a custom PowerShell object that represents the properties of a LogicMonitor device. Required properties are: displayName and id.
         .PARAMETER DeviceId
             Represents a LogicMonitor device ID.
-        .PARAMETER DisableDataSourceName
-            A comma-separated list of DataSource names (not display names), for which instances will be disabled.
+        .PARAMETER LogicModuleName
+            A comma-separated list of LogicModule names (not display names), for which instances will be disabled.
         .PARAMETER Filter
             Represents a string matching the API's filter format. This parameter can be used to filter for instances matching certain criteria (e.g. "camera" is in the instance description).
 
@@ -37,20 +38,21 @@ Function Disable-LogicMonitorDataSourceInstance {
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -Verbose
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Verbose
 
             In this example, the cmdlet will disable all instances of the snmp64_if- DataSource. Verbose output is sent to the host only.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
 
             In this example, the cmdlet will disable alerting for all instances of the snmp64_if- DataSource. Verbose output is sent to the host and C:\Temp\log.txt.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
 
             In this example, the cmdlet will disable all instances of the snmp64_if- DataSource, that do not match the filter (any instance where the description is not like "camera" or "uplink"). Verbose output is sent to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Disable-DataSourceInstance')]
+    [alias("Disable-LogicMonitorDataSourceInstance")]
     param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -74,7 +76,8 @@ Function Disable-LogicMonitorDataSourceInstance {
         [int]$DeviceId,
 
         [Parameter(Mandatory = $True)]
-        [string[]]$DisableDataSourceName,
+        [alias('DisableLogicModuleName')]
+        [string[]]$LogicModuleName,
 
         [string]$Filter,
 
@@ -180,15 +183,15 @@ Function Disable-LogicMonitorDataSourceInstance {
         #endregion Get LogicModules
 
         #region Parse data
-        Foreach ($dsName in $DisableDataSourceName) {
+        Foreach ($dsName in $LogicModuleName) {
             If ($dsName -in $dataSources.dataSourceName) {
-                $appliedDataSource = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
+                $appliedLogicModule = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
 
-                If ($appliedDataSource.instanceNumber -gt 0) {
-                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName)
+                If ($appliedLogicModule.instanceNumber -gt 0) {
+                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances"
+                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances"
 
                     If ($Filter) { $queryParams = "?filter=$Filter" } Else { $queryParams = $null }
 
@@ -217,7 +220,7 @@ Function Disable-LogicMonitorDataSourceInstance {
                     Try {
                         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
                     } Catch {
-                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName, $_.Exception.Message)
+                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName, $_.Exception.Message)
                         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                         Return 1
@@ -235,7 +238,7 @@ Function Disable-LogicMonitorDataSourceInstance {
 
                     Foreach ($instance in $response.items) {
                         $response = $null
-                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances/$($instance.id)"
+                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances/$($instance.id)"
                         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
                         # Get current time in milliseconds
@@ -291,7 +294,7 @@ Function Disable-LogicMonitorDataSourceInstance {
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
             } Else {
-                $message = ("{0}: Script complete. No DataSources found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
+                $message = ("{0}: Script complete. No LogicModules found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
         }
@@ -300,4 +303,4 @@ Function Disable-LogicMonitorDataSourceInstance {
     End {
         Return $exitCode
     }
-} #2022.05.04.0
+} #2022.09.29.0
