@@ -1855,10 +1855,10 @@ Function Add-LogicMonitorWebsiteGroup {
     $response
 }
 #1.0.0.2
-Function Disable-LogicMonitorDataSourceInstance {
+Function Disable-LogicMonitorLogicModuleInstance {
     <#
         .DESCRIPTION
-            Accepts a comma-separated list of DataSources to disable (-DisableDataSourceName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
+            Accepts a comma-separated list of LogicModules to disable (-LogicModuleName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
         .NOTES
             Author: Mike Hashemi
             V2022.05.02.0
@@ -1867,6 +1867,7 @@ Function Disable-LogicMonitorDataSourceInstance {
             V2022.05.04.0
             V2022.05.04.1
             V2022.06.09.0
+            V2022.09.29.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -1879,8 +1880,8 @@ Function Disable-LogicMonitorDataSourceInstance {
             Represents a custom PowerShell object that represents the properties of a LogicMonitor device. Required properties are: displayName and id.
         .PARAMETER DeviceId
             Represents a LogicMonitor device ID.
-        .PARAMETER DisableDataSourceName
-            A comma-separated list of DataSource names (not display names), for which instances will be disabled.
+        .PARAMETER LogicModuleName
+            A comma-separated list of LogicModule names (not display names), for which instances will be disabled.
         .PARAMETER Filter
             Represents a string matching the API's filter format. This parameter can be used to filter for instances matching certain criteria (e.g. "camera" is in the instance description).
 
@@ -1894,20 +1895,21 @@ Function Disable-LogicMonitorDataSourceInstance {
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -Verbose
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Verbose
 
             In this example, the cmdlet will disable all instances of the snmp64_if- DataSource. Verbose output is sent to the host only.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
 
             In this example, the cmdlet will disable alerting for all instances of the snmp64_if- DataSource. Verbose output is sent to the host and C:\Temp\log.txt.
         .EXAMPLE
-            PS C:\> Disable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisableDataSourceName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
+            PS C:\> Disable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
 
             In this example, the cmdlet will disable all instances of the snmp64_if- DataSource, that do not match the filter (any instance where the description is not like "camera" or "uplink"). Verbose output is sent to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Disable-DataSourceInstance')]
+    [alias("Disable-LogicMonitorDataSourceInstance")]
     param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -1931,7 +1933,8 @@ Function Disable-LogicMonitorDataSourceInstance {
         [int]$DeviceId,
 
         [Parameter(Mandatory = $True)]
-        [string[]]$DisableDataSourceName,
+        [alias('DisableLogicModuleName')]
+        [string[]]$LogicModuleName,
 
         [string]$Filter,
 
@@ -2037,15 +2040,15 @@ Function Disable-LogicMonitorDataSourceInstance {
         #endregion Get LogicModules
 
         #region Parse data
-        Foreach ($dsName in $DisableDataSourceName) {
+        Foreach ($dsName in $LogicModuleName) {
             If ($dsName -in $dataSources.dataSourceName) {
-                $appliedDataSource = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
+                $appliedLogicModule = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
 
-                If ($appliedDataSource.instanceNumber -gt 0) {
-                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName)
+                If ($appliedLogicModule.instanceNumber -gt 0) {
+                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances"
+                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances"
 
                     If ($Filter) { $queryParams = "?filter=$Filter" } Else { $queryParams = $null }
 
@@ -2074,7 +2077,7 @@ Function Disable-LogicMonitorDataSourceInstance {
                     Try {
                         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
                     } Catch {
-                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName, $_.Exception.Message)
+                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName, $_.Exception.Message)
                         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                         Return 1
@@ -2092,7 +2095,7 @@ Function Disable-LogicMonitorDataSourceInstance {
 
                     Foreach ($instance in $response.items) {
                         $response = $null
-                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances/$($instance.id)"
+                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances/$($instance.id)"
                         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
                         # Get current time in milliseconds
@@ -2148,7 +2151,7 @@ Function Disable-LogicMonitorDataSourceInstance {
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
             } Else {
-                $message = ("{0}: Script complete. No DataSources found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
+                $message = ("{0}: Script complete. No LogicModules found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
         }
@@ -2157,15 +2160,16 @@ Function Disable-LogicMonitorDataSourceInstance {
     End {
         Return $exitCode
     }
-} #2022.05.04.0
-Function Enable-LogicMonitorDataSourceInstance {
+} #2022.09.29.0
+Function Enable-LogicMonitorLogicModuleInstance {
     <#
         .DESCRIPTION
-            Accepts a comma-separated list of DataSources to Enable (-EnableDataSourceName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
+            Accepts a comma-separated list of LogicModules to enable (-LogicModuleName), on a user-specified device. Accepts a properly-formatted string for filtering instances.
         .NOTES
             Author: Mike Hashemi
             V2022.05.04.0
             V2022.06.09.0
+            V2022.09.29.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -2178,8 +2182,8 @@ Function Enable-LogicMonitorDataSourceInstance {
             Represents a custom PowerShell object that represents the properties of a LogicMonitor device. Required properties are: displayName and id.
         .PARAMETER DeviceId
             Represents a LogicMonitor device ID.
-        .PARAMETER EnableDataSourceName
-            A comma-separated list of DataSource names (not display names), for which instances will be Enabled.
+        .PARAMETER LogicModuleName
+            A comma-separated list of LogicModule names (not display names), for which instances will be Enabled.
         .PARAMETER Filter
             Represents a string matching the API's filter format. This parameter can be used to filter for instances matching certain criteria (e.g. "camera" is in the instance description).
 
@@ -2193,20 +2197,21 @@ Function Enable-LogicMonitorDataSourceInstance {
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Enable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -EnableDataSourceName snmp64_if- -Verbose
+            PS C:\> Enable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Verbose
 
             In this example, the cmdlet will Enable all instances of the snmp64_if- DataSource. Verbose output is sent to the host only.
         .EXAMPLE
-            PS C:\> Enable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -EnableDataSourceName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
+            PS C:\> Enable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -AlertingOnly -Verbose -LogPath C:\Temp\log.txt
 
             In this example, the cmdlet will Enable alerting for all instances of the snmp64_if- DataSource. Verbose output is sent to the host and C:\Temp\log.txt.
         .EXAMPLE
-            PS C:\> Enable-DataSourceInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -EnableDataSourceName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
+            PS C:\> Enable-LogicMonitorLogicModuleInstance -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -LogicModuleName snmp64_if- -Filter 'description!~"camera",description!~"uplink"'
 
             In this example, the cmdlet will Enable all instances of the snmp64_if- DataSource, that do not match the filter (any instance where the description is not like "camera" or "uplink"). Verbose output is sent to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Enable-DataSourceInstance')]
+    [alias("Enable-LogicMonitorDataSourceInstance")]
     param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -2230,7 +2235,8 @@ Function Enable-LogicMonitorDataSourceInstance {
         [int]$DeviceId,
 
         [Parameter(Mandatory = $True)]
-        [string[]]$EnableDataSourceName,
+        [alias('EnableLogicModuleName')]
+        [string[]]$LogicModuleName,
 
         [string]$Filter,
 
@@ -2336,15 +2342,15 @@ Function Enable-LogicMonitorDataSourceInstance {
         #endregion Get LogicModules
 
         #region Parse data
-        Foreach ($dsName in $EnableDataSourceName) {
+        Foreach ($dsName in $LogicModuleName) {
             If ($dsName -in $dataSources.dataSourceName) {
-                $appliedDataSource = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
+                $appliedLogicModule = $dataSources | Where-Object { $_.dataSourceName -eq $dsName }
 
-                If ($appliedDataSource.instanceNumber -gt 0) {
-                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName)
+                If ($appliedLogicModule.instanceNumber -gt 0) {
+                    $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances"
+                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances"
 
                     If ($Filter) { $queryParams = "?filter=$Filter" } Else { $queryParams = $null }
 
@@ -2373,7 +2379,7 @@ Function Enable-LogicMonitorDataSourceInstance {
                     Try {
                         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
                     } Catch {
-                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedDataSource.dataSourceName, $_.Exception.Message)
+                        $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName, $_.Exception.Message)
                         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                         Return 1
@@ -2391,7 +2397,7 @@ Function Enable-LogicMonitorDataSourceInstance {
 
                     Foreach ($instance in $response.items) {
                         $response = $null
-                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedDataSource.Id)/instances/$($instance.id)"
+                        $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances/$($instance.id)"
                         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
                         # Get current time in milliseconds
@@ -2447,7 +2453,7 @@ Function Enable-LogicMonitorDataSourceInstance {
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
             } Else {
-                $message = ("{0}: Script complete. No DataSources found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
+                $message = ("{0}: Script complete. No LogicModules found assigned to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Device.id)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
             }
         }
@@ -2456,7 +2462,7 @@ Function Enable-LogicMonitorDataSourceInstance {
     End {
         Return $exitCode
     }
-} #2022.05.04.0
+} #2022.09.29.0
 Function Get-LogicMonitorAlert {
     <#
         .DESCRIPTION
@@ -6152,12 +6158,13 @@ Function Get-LogicMonitorDataSource {
 Function Get-LogicMonitorDataSourceDevice {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor devices with an associated with a specific DataSource.
+            Returns a list of LogicMonitor devices associated with a specific DataSource.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 6 July 2021
                 -Initial release.
             V1.0.0.1 date: 30 July 2021
+            V2022.09.29.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -6328,7 +6335,7 @@ Function Get-LogicMonitorDataSourceDevice {
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.1
+} #2022.09.29.0
 Function Get-LogicMonitorDevice {
     <#
         .DESCRIPTION
@@ -14881,47 +14888,7 @@ Function Update-LogicMonitorDeviceProperty {
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 12 December 2016
-            V1.0.0.1 date: 31 January 2017
-                - Updated syntax and logging.
-                - Improved error handling.
-            V1.0.0.2 date: 31 January 2017
-                - Updated error output color.
-                - Streamlined header creation (slightly).
-            V1.0.0.3 date: 31 January 2017
-                - Added $logPath output to host.
-            V1.0.0.4 date: 31 January 2017
-                - Added additional logging.
-            V1.0.0.5 date: 10 February 2017
-                - Updated procedure order.
-            V1.0.0.6 date: 3 May 2017
-                - Removed code from writing to file and added Event Log support.
-                - Updated code for verbose logging.
-                - Changed Add-EventLogSource failure behavior to just block logging (instead of quitting the function).
-            V1.0.0.7 date: 21 June 2017
-                - Updated logging to reduce chatter.
-            V1.0.0.8 date: 12 July 2017
-                - Added -EventLogSource to a couple of cmdlet calls.
-            V1.0.0.9 date: 1 August 2017
-                - Updated inline documentation.
-            V1.0.0.10 date: 28 September 2017
-                - Replaced ! with -Not.
-            V1.0.0.11 date: 23 April 2018
-                - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
-            V1.0.0.12 date: 11 July 2018
-                - Updated white space.
-                - Updated in-line help.
-            V1.0.0.13 date: 18 July 2018
-                - More whites space updates.
-                - Added the API's response to the return data when there is an Invoke-RestMethod failure.
-            V1.0.0.14 date: 18 March 2019
-                - Updated alias publishing method.
-            V1.0.0.15 date: 23 August 2019
-            V1.0.0.16 date: 26 August 2019
-            V1.0.0.17 date: 18 October 2019
-            V1.0.0.18 date: 4 December 2019
-            V1.0.0.19 date: 10 December 2019
-            V1.0.0.20 date: 23 July 2020
-            V1.0.0.21 date: 21 September 2021
+            V2022.10.24.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -15001,7 +14968,7 @@ Function Update-LogicMonitorDeviceProperty {
     $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    # Initialize variables.
+    #region Initialize variables
     [int]$index = 0
     $propertyData = ""
     $standardProperties = ""
@@ -15011,47 +14978,46 @@ Function Update-LogicMonitorDeviceProperty {
     $resourcePath = "/device/devices"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    #endregion Initialize variables
 
+    #region Logging splatting
     # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
                 Verbose        = $true
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 Verbose = $true
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
+        } Else {
+            $loggingParams = @{
                 Verbose = $true
             }
         }
-    }
-    Else {
+    } Else {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
                 Verbose        = $false
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 Verbose = $false
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
+        } Else {
+            $loggingParams = @{
                 Verbose = $false
             }
         }
     }
+    #endregion Logging splatting
 
+    #region Set resource path
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
@@ -15061,7 +15027,7 @@ Function Update-LogicMonitorDeviceProperty {
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $DisplayName)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @commandParams
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -DisplayName $DisplayName @loggingParams
 
             $resourcePath += "/$($device.id)"
 
@@ -15072,7 +15038,7 @@ Function Update-LogicMonitorDeviceProperty {
             $message = ("{0}: Attempting to retrieve the device ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @commandParams
+            $device = Get-LogicMonitorDevice -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Name $Name @loggingParams
 
             If ($device.count -gt 1) {
                 $message = ("{0}: More than one device with the name {1} were detected (specifically {2}). To prevent errors, {3} will exit." `
@@ -15091,8 +15057,11 @@ Function Update-LogicMonitorDeviceProperty {
 
     $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #endregion Set resource path
 
+    #region Parse properties
     # For each property, assign the name and value to $propertyData.
+    $PropertyValues = $PropertyValues.Replace('\', '\\')
     Foreach ($property in $PropertyNames) {
         Switch ($property) {
             { $_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId") } {
@@ -15117,8 +15086,7 @@ Function Update-LogicMonitorDeviceProperty {
                 If ($property -like "*pass") {
                     $message = ("{0}: Updating/adding property: {1} with a value of ********." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-                Else {
+                } Else {
                     $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property, $($PropertyValues[$index]))
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
@@ -15132,8 +15100,7 @@ Function Update-LogicMonitorDeviceProperty {
 
     If ($customProps -eq $True) {
         $queryParams += "customProperties&opType=replace"
-    }
-    Else {
+    } Else {
         $queryParams = $queryParams.TrimEnd(",")
         $queryParams += "&opType=replace"
     }
@@ -15149,15 +15116,15 @@ Function Update-LogicMonitorDeviceProperty {
 
         # Assign the entire string to the $data variable.
         $data = "{$standardProperties,`"customProperties`":[$propertyData]}"
-    }
-    ElseIf (($standardProperties.Length -gt 0) -and ($propertyData.Length -le 0)) {
+    } ElseIf (($standardProperties.Length -gt 0) -and ($propertyData.Length -le 0)) {
         $data = "{$standardProperties}"
-    }
-    Else {
+    } Else {
         # Assign the entire string to the $data variable.
         $data = "{`"customProperties`":[$propertyData]}"
     }
+    #endregion Parse properties
 
+    #region REST auth
     $enc = [System.Text.Encoding]::UTF8
     $encdata = $enc.GetBytes($data)
 
@@ -15168,7 +15135,7 @@ Function Update-LogicMonitorDeviceProperty {
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
     # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
     # Concatenate Request Details
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
@@ -15185,22 +15152,21 @@ Function Update-LogicMonitorDeviceProperty {
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
     }
+    #endregion REST auth
 
-    # Make Request
+    #region REST command
     $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
         $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
-    }
-    Catch {
+    } Catch {
         If ($_.Exception.Message -match '429') {
             $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
             Start-Sleep -Seconds 60
-        }
-        Else {
+        } Else {
             $message = ("{0}: Unexpected error updating LogicMonitor device property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
             Error message: {2}`r
             Error code: {3}`r
@@ -15215,6 +15181,7 @@ Function Update-LogicMonitorDeviceProperty {
             Return "Error", $response
         }
     }
+    #endregion REST command
 
     If ($response.status -ne "200") {
         $message = ("{0}: LogicMonitor reported an error (status {1}). The message is: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
@@ -15222,7 +15189,7 @@ Function Update-LogicMonitorDeviceProperty {
     }
 
     Return $response
-} #1.0.0.21
+} #2022.10.24.0
 Function Update-LogicMonitorWebsiteProperty {
     <#
         .DESCRIPTION

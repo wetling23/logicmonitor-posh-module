@@ -26,6 +26,8 @@
             V1.0.0.14 date: 1 November 2021
             V1.0.0.15 date: 3 November 2021
             V1.0.0.16 date: 16 August 2022
+            V1.0.0.17 date: 18 August 2022
+            V2022.10.24.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -128,13 +130,13 @@
         $message = ("{0}: Using the start and end epochs specified in the Filter parameter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
     }
-    ElseIf (-NOT($StartDate) -and -NOT($EndDate)) {
+    ElseIf (-NOT($StartDate -and $EndDate)) {
         $message = ("{0}: No start or end epoch specified, defaulting to the past five years (or as far back as the alerts go)." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
     }
     ElseIf ($StartDate -and -NOT($EndDate)) {
         $message = ("{0}: End epoch not specified, defaulting to the current time." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -142,9 +144,9 @@
 
         [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
     }
-    ElseIf (-NOT($StartDate -and $EndDate)) {
+    ElseIf (-NOT($StartDate) -and $EndDate) {
         $message = ("{0}: Start epoch not specified, defaulting to the past day." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
@@ -155,7 +157,7 @@
     ElseIf ($StartDate -and $EndDate) {
         [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
-        $Filter += "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
     }
     ElseIf ($PsCmdlet.ParameterSetName -eq "AllAlerts") {
         $message = ("{0}: Attempting to get as many alerts as possible." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -164,7 +166,7 @@
         # Same action as "no date" but left here for backwards compatibility. Defaulting to all alerts in the last five years (or as far back as the alerts go).
         [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
         [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
     }
 
     If ($StartDate -or $EndDate) {
@@ -173,32 +175,10 @@
     }
     #endregion Parsing dates
 
-    If ($Filter) {
-        $message = ("{0}: Converting special characters to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    $message = ("{0}: Converting special characters in the filter, to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        Switch ($Filter) {
-            { $_.Contains('&') } { $Filter = $Filter.Replace('&', "%26") }
-            { $_.Contains('#') } { $Filter = $Filter.Replace('#', "%23") }
-            { $_.Contains(')') } { $Filter = $Filter.Replace(')', "%29") }
-            { $_.Contains('(') } { $Filter = $Filter.Replace('(', "%28") }
-            { $_.Contains('/') } { $Filter = $Filter.Replace('/', "%2F") }
-            { $_.Contains('*') } { $Filter = $Filter.Replace('*', "%2A") }
-            { $_.Contains(' ') } { $Filter = $Filter.Replace(' ', "%20") }
-            { $_.Contains('|') } { $Filter = $Filter.Replace('|', "%7C") }
-            { $_.Contains('$') } { $Filter = $Filter.Replace('$', "%24") }
-            { $_.Contains('\') } { $Filter = $Filter.Replace('\', "%5C") }
-            { $_.Contains('_') } { $Filter = $Filter.Replace('_', "%5F") }
-            { $_.Contains(',') } { $Filter = $Filter.Replace(',', "%2C") }
-            { $_.Contains('"') } { $Filter = $Filter.Replace('"', "%22") }
-            { $_.Contains('<') } { $Filter = $Filter.Replace('<', "%3C") }
-            { $_.Contains('>') } { $Filter = $Filter.Replace('>', "%3E") }
-            { $_.Contains(':') } { $Filter = $Filter.Replace(':', "%3A") }
-
-        }
-
-        $Filter = $Filter -replace "^filter="
-    }
+    $Filter = [System.Net.WebUtility]::UrlEncode($Filter.TrimStart(',')) -replace "^filter="
     #endregion Setup
 
     #region Main
@@ -231,7 +211,7 @@
 
             # Construct Headers
             $headers = @{
-                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+                "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
                 "X-Version"     = 2
             }
@@ -244,7 +224,7 @@
         $stopLoop = $false
         Do {
             Try {
-                $response = [System.Collections.Generic.List[PSObject]]@((Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop).items)
+                $response = [System.Collections.Generic.List[PSObject]]@((Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
 
                 $stopLoop = $True
             }
@@ -285,4 +265,4 @@
     #endregion Main
 
     Return $alerts
-} #1.0.0.16
+} #2022.10.24.0

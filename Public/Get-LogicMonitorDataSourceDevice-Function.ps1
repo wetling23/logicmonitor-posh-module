@@ -1,12 +1,13 @@
 Function Get-LogicMonitorDataSourceDevice {
     <#
         .DESCRIPTION
-            Returns a list of LogicMonitor devices with an associated with a specific DataSource.
+            Returns a list of LogicMonitor devices associated with a specific DataSource.
         .NOTES
             Author: Mike Hashemi
             V1.0.0.0 date: 6 July 2021
                 -Initial release.
             V1.0.0.1 date: 30 July 2021
+            V2022.09.29.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -177,4 +178,4 @@ Function Get-LogicMonitorDataSourceDevice {
     Until (($stopLoop -eq $true) -or ($singleDeviceCheckDone))
 
     $devices
-} #1.0.0.1
+} #2022.09.29.0
