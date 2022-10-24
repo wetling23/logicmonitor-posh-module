@@ -77,11 +77,11 @@ Function Out-PsLogging {
     )
 
     # Initialize variables.
-    If ($IsWindows) {
+    If ($([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows))) {
         $elevatedSession = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     }
 
-    If (($PsCmdlet.ParameterSetName -eq "EventLog") -and ($IsWindows)) {
+    If (($PsCmdlet.ParameterSetName -eq "EventLog") -and $([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows))) {
         If ([System.Diagnostics.EventLog]::SourceExists("$EventLogSource")) {
             # The event source does not exists, nothing else to do.
 
