@@ -14,6 +14,7 @@ Function Out-PsLogging {
             V1.0.0.6 date: 8 April 2021
             V1.0.0.7 date: 10 September 2021
             V1.0.0.8 date: 20 September 2021
+            V2022.10.24.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER EventLogSource
@@ -76,9 +77,11 @@ Function Out-PsLogging {
     )
 
     # Initialize variables.
-    $elevatedSession = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    If ($IsWindows) {
+        $elevatedSession = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
 
-    If ($PsCmdlet.ParameterSetName -eq "EventLog") {
+    If (($PsCmdlet.ParameterSetName -eq "EventLog") -and ($IsWindows)) {
         If ([System.Diagnostics.EventLog]::SourceExists("$EventLogSource")) {
             # The event source does not exists, nothing else to do.
 
@@ -153,4 +156,4 @@ Function Out-PsLogging {
             }
         }
     }
-} #1.0.0.8
+} #2022.10.24.0
