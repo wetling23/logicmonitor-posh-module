@@ -327,7 +327,7 @@ Function Enable-LogicMonitorLogicModuleInstance {
                     Try {
                         $response = Invoke-RestMethod -Uri $url -Method "PATCH" -Header $headers -Body $body -ErrorAction Stop
                     } Catch {
-                        $message = ("{0}: Unexpected error disabling the instance, `"{1}`". Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name, $_.Exception.Message)
+                        $message = ("{0}: Unexpected error enabling the instance, `"{1}`". Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name, $_.Exception.Message)
                         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
 
                         $exitCode = 1
