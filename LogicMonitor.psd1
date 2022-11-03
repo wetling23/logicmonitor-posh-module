@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.2.9'
+    ModuleVersion     = '1.0.2.11'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -61,7 +61,7 @@
     FunctionsToExport =
     'Add-EventLogSource', 'Add-LogicMonitorAlertRule', 'Add-LogicMonitorCollector', 'Add-LogicMonitorDashboard',
     'Add-LogicMonitorDashboardGroup', 'Add-LogicMonitorDashboardWidget', 'Add-LogicMonitorDevice', 'Add-LogicMonitorDeviceGroup',
-    'Add-LogicMonitorReportGroup', 'Add-LogicMonitorWebsiteGroup',
+    'Add-LogicMonitorReportGroup', 'Add-LogicMonitorWebsite', 'Add-LogicMonitorWebsiteGroup',
     'Confirm-OutputPathAvailability',
     'Disable-LogicMonitorLogicModuleInstance',
     'Enable-LogicMonitorLogicModuleInstance',
@@ -117,7 +117,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Disable-LogicMonitorDataSourceInstance to 2022.10.27.0 (added support for DeviceLogicModuleId parameter).'
+            ReleaseNotes = 'Updated Get-LogicMonitorAlert to 2022.11.03.1 (added support for new FilterArray property and worked around API limitations for "endEpoch").'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''

@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 1.0.2.11
+- Get-LogicMonitorAlert
+  - Added back the option to provide a filter in the form of a hashtable, but added a property of the hashtable, to indicate the desired comparison operator (e.g. '<', '>', ':', '<:', '>:' and note that ':<' is invalid).
 ## 1.0.1.84
 - Get-LogicMonitorAlert
   - Changed the format of the data accepted by the Filter parameter. Instead of accepting a hashtable of limited properties, the cmdlet now accepts a string formatted like, "filter=...".

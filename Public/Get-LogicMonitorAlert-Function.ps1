@@ -6,28 +6,10 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 16 January 2017
                 - Initial release.
-            V1.0.0.2 date: 10 February 2017
-                - Updated procedure order.
-            V1.0.0.3 date: 23 April 2018
-                - Updated code to allow PowerShell to use TLS 1.1 and 1.2.
-                - Updated logging setup.
-            V1.0.0.4 date: 14 March 2019
-                - Added support for rate-limited re-try.
-            V1.0.0.5 date: 10 April 2019
-                - Updated filtering.
-            V1.0.0.6 date: 23 August 2019
-            V1.0.0.7 date: 26 August 2019
-            V1.0.0.8 date: 18 October 2019
-            V1.0.0.9 date: 4 December 2019
-            V1.0.0.10 date: 23 July 2020
-            v1.0.0.11 date: 25 September 2020
-            v1.0.0.12 date: 25 October 2021
-            V1.0.0.13 date: 26 October 2021
-            V1.0.0.14 date: 1 November 2021
-            V1.0.0.15 date: 3 November 2021
-            V1.0.0.16 date: 16 August 2022
-            V1.0.0.17 date: 18 August 2022
             V2022.10.24.0
+            V2022.11.01.0
+            V2022.11.03.0
+            V2022.11.03.1
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -36,12 +18,6 @@
             Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER StartDate
-            Represents the beginning of the time range, for which alerts will be retireved. If no value is provided (but an end date is provided), minus one day (-1) is used. If no start/end date is provided, up to the previous five years is used.
-        .PARAMETER EndDate
-            Represents the end of the time range, for which alerts will be retireved. If no value is provided (but an end date is provided), the current date is used. If no start/end date is provided, up to the previous five years is used.
-        .PARAMETER All
-            Depricated parameter. When included, the cmdlet returns all open alerts, up to the LogicMonitor API limit (10000 as of 10 April 2019).
         .PARAMETER Filter
             Represents a hashtable of filterable alert properties and the value, for which to filter. Valid values are:
                 'id', 'type', 'acked', 'rule', 'chain', 'severity', 'cleared', 'sdted', 'monitorObjectName', 'monitorObjectGroups', 'resourceTemplateName', 'instanceName', 'dataPointName'
@@ -55,53 +31,112 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -BlockLogging -Verbose
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -Verbose
 
-            In this example, the cmdlet gets all alerts (up to the API maximum) going back as far as five years (or the maximum duration of available alerts). Verbose output is sent to the session host only.
+            In this example, the cmdlet will get all alerts (up to the maximum), as far back as five years (or the maximum data-retention limit).
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter 'filter=severity:2,cleared:"false"' -StartDate (Get-Date -Month 1 -Day 1)
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -StartDate (Get-Date -Month 1 -Day 1) -Verbose
 
-            In this example, the cmdlet gets all open alerts (up to the API maximum) at the warning threshold, beginning on January 1 and ending on the current date. Limited logging output is sent to the session host only.
+            In this example, the cmdlet will get all alerts beginning after the start of the current month.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter "filter=severity:2,cleared:`"false`"" -EndDate (Get-Date).AddHours(-1) -Verbose -LogPath C:\Temp\log.txt
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -EndDate (Get-Date).AddHours(-1) -Verbose
 
-            In this example, the cmdlet gets all open alerts (up to the API maximum) at the warning threshold, beginning one day ago and ending one hour ago. Verbose logging output is sent to the session host and C:\Temp\log.txt.
+            In this example, the cmdlet will get all alerts that ended before one hour ago.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorAlert -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Filter "filter=type:`"websiteAlert`",cleared:`"false`",startEpoch>:$(([DateTimeOffset](Get-Date).AddMinutes(-90)).ToUnixTimeSeconds())"
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -Filter 'severity<"3",sdted:"false",cleared:"",startEpoch<:"1667495125"' -Verbose
 
-            In this example, the cmdlet gets all open alerts (up to the API maximum), beginning on or after the 90 minutes ago. Limited logging output is sent to the session host only.
+            In this example, the cmdlet will get all open alerts, which started before November 3, 2022 5:05:25 PM (GMT) and that are a higher severity than "3" and are not in SDT.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -Filter 'filter=severity:2,cleared:"false"' -Verbose
+
+            In this example, the cmdlet will get all open alerts with severity "2", as far bas as five years (or the maximum data-retention limit).
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -Filter 'severity<"3",sdted:"false",cleared:"false",startEpoch>:"1667494500",startEpoch<:"1667495125"' -Verbose
+
+            In this example, the cmdlet will get all open alerts that began between November 3, 2022 4:55:00 PM (GMT) and November 3, 2022 5:05:25 PM (GMT).
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessID $accessId -AccessKey $accessKey -AccountName synoptek -Filter ('filter=type:"websiteAlert",cleared:"false",startEpoch>:"{0}"' -f $(([DateTimeOffset](Get-Date).AddMinutes(-90)).ToUnixTimeSeconds())) -Verbose
+
+            In this example, the cmdlet will get all open website alerts, that started before 90 minutes ago.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared All -Verbose
+
+            In this example, the cmdlet will get all alerts (up to the maximum), as far back as five years (or the maximum data-retention limit).
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared No -Verbose
+
+            In this example, the cmdlet will get all alerts (up to the maximum), as far back as five years (or the maximum data-retention limit).
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared Yes -FilterArray @(@{ name = 'startEpoch'; value = (Get-Date).AddHours(-1); comparison = '>:' }) -Verbose
+
+            In this example, the cmdlet will get all cleared alerts that started more than one hour ago.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared Yes -FilterArray @(@{ name = 'endEpoch'; value = (Get-Date).AddDays(-10); comparison = '>:'}, @{name = 'type'; value = 'dataSourceAlert'; comparison = ':'}) -Verbose
+
+            In this example, the cmdlet will get all cleared DataSource alerts that ended before 10 days ago.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared No -FilterArray @(@{ name = 'startEpoch'; value = (Get-Date -Month 1 -Day 1); comparison = '>:' }, @{ name = 'sdted'; value = 'true'; comparison = ':' }) -Verbose
+
+            In this example, the cmdlet will get all open alerts that began after the first of the current month, and which are in SDT.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared No -FilterArray @(@{ name = 'startEpoch'; value = (Get-Date).AddDays(-1); comparison = '>:' }, @{ name = 'severity'; value = 2; comparison = '<:' }) -Verbose
+
+            In this example, the cmdlet will get all open alerts that began after one day ago and have a severity of "2" or more.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared No -FilterArray @(@{ name = 'severity'; value = '3'; comparison = '<' }, @{ name = 'sdted'; value = 'false'; comparison = ':'}) -Verbose
+
+            In this example, the cmdlet will get all open alerts with a severity creater than "3" and which are not in SDT.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared All -FilterArray @(@{ name = 'dataPointName'; value = 'IdleMinutes'; comparison = ':' }) -Verbose
+
+            In this example, the cmdlet get all alerts for the datapoint called "IdleMinutes".
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared All -FilterArray @(@{ name = 'id'; value = "DS10742262"; comparison = ':' }) -Verbose
+
+            In this example, the cmdlet will get all alerts with the ID "DS10742262".
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorAlert -AccessId $accessId -AccessKey $accessKey -AccountName synoptek -Cleared All -FilterArray @(@{ name = 'monitorObjectName'; value = "server1"; comparison = ':' }) -Verbose
+
+            In this example, the cmdlet will get all alerts for the resource with display name, "server1".
     #>
-    [CmdletBinding(DefaultParameterSetName = 'Default')]
+    [CmdletBinding(DefaultParameterSetName = 'AllAlerts')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
-        [Parameter(ParameterSetName = 'Default')]
-        [Parameter(ParameterSetName = 'Filter')]
+        [Parameter(Mandatory, ParameterSetName = 'FilterArray')]
+        [Array]$FilterArray,
+
+        [Parameter(ParameterSetName = 'AllAlerts')]
+        [Parameter(ParameterSetName = 'FilterArray')]
+        [ValidateSet('All', 'Yes', 'No')]
+        [String]$Cleared = 'All',
+
+        [Parameter(ParameterSetName = 'ManualStartEnd')]
         [datetime]$StartDate,
 
-        [Parameter(ParameterSetName = 'Default')]
-        [Parameter(ParameterSetName = 'Filter')]
+        [Parameter(ParameterSetName = 'ManualStartEnd')]
         [datetime]$EndDate,
 
         [Parameter(ParameterSetName = 'AllAlerts')]
         [switch]$All,
 
+        [Parameter(ParameterSetName = 'Filter')]
         [string]$Filter,
 
-        [int]$BatchSize = 1000,
+        [Int]$BatchSize = 1000,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
     $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
@@ -115,78 +150,175 @@
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/alert/alerts" # Define the resourcePath.
     $alerts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the alerts.
+    $filterList = [System.Collections.Generic.List[PSObject]]::new()
     $response = $null
     [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+    If ($All) { $Cleared = 'All' } # Forcing $Cleared, for backwards compatibility.
     #endregion Initilize variables
+    #endregion Setup
 
     $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    #region Parsing dates
-    If ($Filter -and ($Filter -match 'startEpoch|endEpoch')) {
-        # Nothing to do, we will use the user-provided epochs for filtering.
-        $message = ("{0}: Using the start and end epochs specified in the Filter parameter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-    }
-    ElseIf (-NOT($StartDate -and $EndDate)) {
-        $message = ("{0}: No start or end epoch specified, defaulting to the past five years (or as far back as the alerts go)." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    Switch ($PsCmdlet.ParameterSetName) {
+        'AllAlerts' {
+            $message = ("{0}: Preparing to look for alerts between {1} and {2} (local time)." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), (Get-Date).AddYears(-5), (Get-Date))
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
-    }
-    ElseIf ($StartDate -and -NOT($EndDate)) {
-        $message = ("{0}: End epoch not specified, defaulting to the current time." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            $filterList.Add("startEpoch>:`"$(([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds())`"")
+            $filterList.Add("endEpoch<:`"$(([DateTimeOffset](Get-Date)).ToUnixTimeSeconds())`"")
 
-        [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
-    }
-    ElseIf (-NOT($StartDate) -and $EndDate) {
-        $message = ("{0}: Start epoch not specified, defaulting to the past day." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            Switch ($Cleared) {
+                'All' {
+                    $filterList.Add('cleared:"*"')
+                }
+                'Yes' {
+                    $filterList.Add("cleared:true")
+                }
+                'No' {
+                    $filterList.Remove($($filterList | Where-Object { $_ -match 'endEpoch.*' }))
+                    $filterList.Add("cleared:`"`"")
+                    $filterList.Add("startEpoch<:`"{0}`"" -f ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()) # Replacing endDate, because it will be 0 for open alerts
+                }
+            }
+        }
+        'FilterArray' {
+            #region Validate hashtable keys
+            $temp = [System.Collections.Generic.List[PSObject]]::new()
+            Foreach ($item in $FilterArray) {
+                $temp.Add($item)
+            }
 
-        [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddDays(-1)).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
-        $Filter += "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
-    }
-    ElseIf ($StartDate -and $EndDate) {
-        [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
-        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
-    }
-    ElseIf ($PsCmdlet.ParameterSetName -eq "AllAlerts") {
-        $message = ("{0}: Attempting to get as many alerts as possible." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            Foreach ($filter in $FilterArray) {
+                If ($filter.Name -notin @(
+                        'id'
+                        'type'
+                        'acked'
+                        'rule'
+                        'chain'
+                        'severity'
+                        'cleared'
+                        'sdted'
+                        'monitorObjectName'
+                        'monitorObjectGroups'
+                        'resourceTemplateName'
+                        'instanceName'
+                        'dataPointName'
+                    )) {
 
-        # Same action as "no date" but left here for backwards compatibility. Defaulting to all alerts in the last five years (or as far back as the alerts go).
-        [decimal]$StartDate = ([DateTimeOffset](Get-Date).AddYears(-5)).ToUnixTimeSeconds()
-        [decimal]$EndDate = ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds()
-        $Filter += ",startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+                    $message = ("{0}: Removing unsupported property from the filter: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filter.Name)
+                    If ($loggingParams.Verbose) { If ($loggingParams.LogPath -or $loggingParams.EventSource) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+                    $null = $temp.Remove($filter)
+                }
+            }
+
+            $FilterArray = $temp
+            #endregion Validate hashtable keys
+
+            #region Build parsed list
+            Foreach ($item in $FilterArray) {
+                Switch ($item) {
+                    { $_.name -eq 'startEpoch' } {
+                        If ($_.value -as [datetime]) {
+                            $filterList.Add("startEpoch$($_.comparison)`"$(([DateTimeOffset]$($_.value)).ToUnixTimeSeconds())`"")
+                        } Else {
+                            $message = ("{0}: The value of the startEpoch ({1}) is not a valid datetime object." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.value)
+                            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+                            Return "Error"
+                        }
+                    }
+                    { $_.name -eq 'endEpoch' } {
+                        If ($_.value -as [datetime]) {
+                            $filterList.Add("endEpoch$($_.comparison)`"$(([DateTimeOffset]$($_.value)).ToUnixTimeSeconds())`"")
+                        } Else {
+                            $message = ("{0}: The value of the endEpoch ({1}) is not a valid datetime object." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.value)
+                            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+
+                            Return "Error"
+                        }
+                    }
+                    { $_.name -notin @('startEpoch', 'endEpoch', 'cleared') } {
+                        $filterList.Add("$($_.name)$($_.comparison)`"$($_.value)`"")
+                    }
+                }
+            }
+
+            Switch ($Cleared) {
+                'All' {
+                    $filterList.Add('cleared:"*"')
+                }
+                'Yes' {
+                    $filterList.Add("cleared:true")
+                }
+                'No' {
+                    $null = $filterList.Remove($($filterList | Where-Object { $_ -match 'endEpoch.*' }))
+                    $filterList.Add("cleared:`"`"")
+                    $filterList.Add("startEpoch<:`"{0}`"" -f ([DateTimeOffset](Get-Date)).ToUnixTimeSeconds())
+                }
+            }
+            #endregion Build parsed list
+        }
+        'ManualStartEnd' {
+            $message = ("{0}: Parsing start/end dates." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+
+            If ($StartDate -and -NOT($EndDate)) {
+                [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
+                $filter = "startEpoch>:`"$StartDate`""
+            } ElseIf (-NOT($StartDate) -and $EndDate) {
+                [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
+                $filter = "endEpoch<:`"$EndDate`""
+            } ElseIf ($StartDate -and $EndDate) {
+                [decimal]$StartDate = ([DateTimeOffset]$StartDate).ToUnixTimeSeconds()
+                [decimal]$EndDate = ([DateTimeOffset]$EndDate).ToUnixTimeSeconds()
+                $filter = "startEpoch>:`"$StartDate`",endEpoch<:`"$EndDate`""
+            }
+
+            If ($StartDate -or $EndDate) {
+                $message = ("{0}: Start date: {1} and end date: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $EndDate)
+                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            }
+        }
     }
 
-    If ($StartDate -or $EndDate) {
-        $message = ("{0}: Start date: {1} and end date: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $EndDate)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-    }
-    #endregion Parsing dates
+    #region Validate comparison operators
+    If (($filterList) -and ($filterList -match ':<')) {
+        $toReplace = $filterList -match ':<'
+        $null = $filterList.Remove($toReplace)
 
-    $message = ("{0}: Converting special characters in the filter, to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        $filterList.Add($($toReplace -replace ':<', '<:'))
+
+        $message = ("{0}: The filter contains an invalid comparison operator, `":<`". Replaced the invalid value with `"<:`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message -BlockStdErr $BlockStdErr }
+    }
+    #endregion Validate comparison operators
+
+    $message = ("{0}: Initial filter: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $(If ($filterList) { ($filterList -join ',') } Else { (($Filter.TrimStart(',')) -replace "^filter=") }))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    $Filter = [System.Net.WebUtility]::UrlEncode($Filter.TrimStart(',')) -replace "^filter="
-    #endregion Setup
+    #region Set filter into encoded string
+    If ($Filter) {
+        # If the filter includes cleared:false or cleared:"false", make sure to remove "endEpoch" and its value.
+        $filterString = [System.Net.WebUtility]::UrlEncode($(If ($Filter -match '(cleared:"false"|cleared:false|cleared:"")') { ((($Filter -replace 'endEpoch', 'startEpoch') -replace ',,', ',') -replace '(cleared:["]false["]|cleared:false)', 'cleared:""').TrimEnd(',').TrimStart(',') -replace "^filter=" } Else { $Filter.TrimStart(',') -replace "^filter=" }))
+    } ElseIf ($filterList) {
+        $filterString = "$([System.Net.WebUtility]::UrlEncode($filterList -join ','))"
+    }
 
-    #region Main
+    $message = ("{0}: Encoded filter: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filterString)
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #endregion Set filter into encoded string
+
+    #region Get alerts
     While (($response.Count -ge 1) -or ($firstLoopDone -eq $false)) {
         $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-        $queryParams = "?filter=$Filter&sort=startEpoch&offset=$offset&size=$BatchSize"
+        $queryParams = "?filter=$filterString&sort=startEpoch&offset=$offset&size=$BatchSize"
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
@@ -197,7 +329,7 @@
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             # Get current time in milliseconds
-            $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
+            $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
             # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
@@ -213,7 +345,7 @@
             $headers = @{
                 "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
-                "X-Version"     = 2
+                "X-Version"     = 3
             }
         }
 
@@ -227,15 +359,13 @@
                 $response = [System.Collections.Generic.List[PSObject]]@((Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
 
                 $stopLoop = $True
-            }
-            Catch {
+            } Catch {
                 If ($_.Exception.Message -match '429') {
                     $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
                     If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 
                     Start-Sleep -Seconds 60
-                }
-                Else {
+                } Else {
                     $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
                         Error code: {3}`r
@@ -262,7 +392,12 @@
         $firstLoopDone = $true
         $batchCount++
     }
-    #endregion Main
+    #endregion Get alerts
+
+    #region Output
+    $message = ("{0}: Returning {1} alerts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), ($alerts | Measure-Object).Count)
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Return $alerts
-} #2022.10.24.0
+    #endregion Output
+} #V2022.11.03.1
