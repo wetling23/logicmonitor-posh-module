@@ -10,6 +10,7 @@
             V2022.11.01.0
             V2022.11.03.0
             V2022.11.03.1
+            V2022.11.03.2
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -207,6 +208,8 @@
                         'resourceTemplateName'
                         'instanceName'
                         'dataPointName'
+                        'startEpoch'
+                        'endEpoch'
                     )) {
 
                     $message = ("{0}: Removing unsupported property from the filter: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filter.Name)
@@ -225,6 +228,8 @@
                     { $_.name -eq 'startEpoch' } {
                         If ($_.value -as [datetime]) {
                             $filterList.Add("startEpoch$($_.comparison)`"$(([DateTimeOffset]$($_.value)).ToUnixTimeSeconds())`"")
+                        } ElseIf ($_.value -as [int]) {
+                            $filterList.Add("startEpoch$($_.comparison)`"$($_.value)`"")
                         } Else {
                             $message = ("{0}: The value of the startEpoch ({1}) is not a valid datetime object." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.value)
                             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
@@ -235,6 +240,8 @@
                     { $_.name -eq 'endEpoch' } {
                         If ($_.value -as [datetime]) {
                             $filterList.Add("endEpoch$($_.comparison)`"$(([DateTimeOffset]$($_.value)).ToUnixTimeSeconds())`"")
+                        } ElseIf ($_.value -as [int]) {
+                            $filterList.Add("endEpoch$($_.comparison)`"$($_.value)`"")
                         } Else {
                             $message = ("{0}: The value of the endEpoch ({1}) is not a valid datetime object." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.value)
                             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
@@ -302,11 +309,11 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     #region Set filter into encoded string
-    If ($Filter) {
+    If ($filterList) {
+        $filterString = "$([System.Net.WebUtility]::UrlEncode($filterList -join ','))"
+    } ElseIf ($Filter) {
         # If the filter includes cleared:false or cleared:"false", make sure to remove "endEpoch" and its value.
         $filterString = [System.Net.WebUtility]::UrlEncode($(If ($Filter -match '(cleared:"false"|cleared:false|cleared:"")') { ((($Filter -replace 'endEpoch', 'startEpoch') -replace ',,', ',') -replace '(cleared:["]false["]|cleared:false)', 'cleared:""').TrimEnd(',').TrimStart(',') -replace "^filter=" } Else { $Filter.TrimStart(',') -replace "^filter=" }))
-    } ElseIf ($filterList) {
-        $filterString = "$([System.Net.WebUtility]::UrlEncode($filterList -join ','))"
     }
 
     $message = ("{0}: Encoded filter: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filterString)
@@ -400,4 +407,4 @@
 
     Return $alerts
     #endregion Output
-} #V2022.11.03.1
+} #V2022.11.03.2
