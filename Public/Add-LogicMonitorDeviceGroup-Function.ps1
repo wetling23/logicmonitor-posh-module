@@ -28,6 +28,7 @@
             V1.0.1.6 date: 18 September 2021
                 - Update by Sven Borer
                 - Added explicit UTF-8 encoding to data sent to the server
+            V2022.11.04.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -124,7 +125,7 @@
         Return "Error"
     }
 
-    $data = ($Properties | ConvertTo-Json)
+    $data = ($Properties | ConvertTo-Json -depth 10)
     $enc = [System.Text.Encoding]::UTF8
     $encdata = $enc.GetBytes($data)
 
@@ -182,5 +183,4 @@
     }
 
     $response
-}
-#1.0.1.6
+} #2022.11.04.0
