@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.2.13'
+    ModuleVersion     = '1.0.2.14'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -117,7 +117,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Add-LogicMonitorDeviceGroup (set max ConvertTo-Json depth).'
+            ReleaseNotes = 'Updated Add-LogicMonitorWebsite to 2022.11.11.0 (support "pingcheck" and changed name to New-LogicMonitorWebsite). Also changed Add-LogicMonitor... to New-LogicMonitor... (keeping existing names as alias).'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''

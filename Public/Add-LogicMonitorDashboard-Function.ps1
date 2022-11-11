@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorDashboard {
+﻿Function New-LogicMonitorDashboard {
     <#
         .DESCRIPTION
             Create a new LogicMonitor dashboard.
@@ -28,7 +28,7 @@
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
             PS C:\> $table = @{name = 'dashboard1'; groupId = 1}
-            PS C:\> Add-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> New-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new dashboard with the following properties:
                 - Name: dashboard1
@@ -53,7 +53,7 @@
                             )
                         )
                     }
-            PS C:\> Add-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
+            PS C:\> New-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
 
             In this example, the function will create a new dashboard with the following properties:
                 - Name: dashboard1
@@ -64,6 +64,7 @@
             The dashboard will be marked public and verbose logging output is sent to the host and log.txt in the current directory.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorDashboard")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

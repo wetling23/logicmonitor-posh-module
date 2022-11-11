@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorCollector {
+﻿Function New-LogicMonitorCollector {
     <#
         .DESCRIPTION
             Creates a LogicMonitor collector, writes the ID to the registry and returns the ID. In a terminating error occurs, "Error" is returned.
@@ -27,6 +27,7 @@
             V1.0.0.10 date: 4 December 2019
             V1.0.0.11 date: 23 July 2020
             V1.0.0.12 Date: 21 September 2021
+            V2022.11.11.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -46,13 +47,14 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Add-LogicMonitorCollector -AccessId $accessid -AccessKey $accesskey -AccountName $accountname -CollectorDisplayName collector1 -Verbose
+            PS C:\> New-LogicMonitorCollector -AccessId $accessid -AccessKey $accesskey -AccountName $accountname -CollectorDisplayName collector1 -Verbose
 
             In this example, the function will create a new collector with the following properties:
                 - Display name: collector1
             As of collector version 22.004, a monitored device for the collector is automatically created with the display name 127.0.0.1_collector_<collectorID> and IP 127.0.0.1. Verbose output is sent to the host.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorCollector")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,
@@ -148,14 +150,14 @@
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
         }
         "1007" {
-            $message = ("{0}: It appears that the web request failed. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
+            $message = ("{0}: It appears that the web request failed. To prevent errors, the New-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
                     -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
             Return "Error"
         }
         Default {
-            $message = ("{0}: Unexpected error creating a new collector in LogicMonitor. To prevent errors, the Add-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
+            $message = ("{0}: Unexpected error creating a new collector in LogicMonitor. To prevent errors, the New-LogicMonitorCollector function will exit. The status was {1} and the error was {2}" `
                     -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 

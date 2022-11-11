@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorDevice {
+﻿Function New-LogicMonitorDevice {
     <#
         .DESCRIPTION
             Adds a monitored device to LogicMonitor. Note that the name (IP or DNS name) must be unique to the collector monitoring the device
@@ -75,7 +75,7 @@
                         displayName = 'server1'
                         preferredCollectorId = '10'
                     }
-            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose
+            PS C:\> New-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose
 
             In this example, the function will create a new device with the following properties:
                 - Name: 10.1.1.2
@@ -94,7 +94,7 @@
                             }
                         )
                     }
-            PS C:\> Add-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> New-LogicMonitorDevice -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new device with the following properties:
                 - Name: 10.1.1.2
@@ -105,6 +105,7 @@
             Verbose output is sent to the host.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorDevice")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

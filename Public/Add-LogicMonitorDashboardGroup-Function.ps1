@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorDashboardGroup {
+﻿Function New-LogicMonitorDashboardGroup {
     <#
         .DESCRIPTION
             Create a new LogicMonitor dashboard group.
@@ -26,7 +26,7 @@
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
             PS C:\> $table = @{name = 'group1'; parentId = 1}
-            PS C:\> Add-LogicMonitorDashboardGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> New-LogicMonitorDashboardGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new DashboardGroup with the following properties:
                 - Name: group1
@@ -43,7 +43,7 @@
                             }
                         )
                     }
-            PS C:\> Add-LogicMonitorDashboardGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
+            PS C:\> New-LogicMonitorDashboardGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
 
             In this example, the function will create a new DashboardGroup with the following properties:
                 - Name: group1
@@ -53,6 +53,7 @@
             Verbose output is sent to the host and log.txt in the current directory.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorDashboardGroup")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

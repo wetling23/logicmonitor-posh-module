@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorDashboardWidget {
+﻿Function New-LogicMonitorDashboardWidget {
     <#
         .DESCRIPTION
             Create a new LogicMonitor dashboard widget.
@@ -55,6 +55,7 @@
             The widget will be a text widget (with "text content" inside) that updates every 15 minutes. Verbose logging output is sent to the host and log.txt in the current directory.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorDashboardWidget")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

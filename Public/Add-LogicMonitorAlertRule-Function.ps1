@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorAlertRule {
+﻿Function New-LogicMonitorAlertRule {
     <#
         .DESCRIPTION
             Creates Alert Rule in LogicMonitor.
@@ -7,6 +7,7 @@
             V1.0.0.0 date: 29 July 2020
             V1.0.0.1 date: 6 August 2020
             V1.0.0.2 date: 21 September 2021
+            V2022.11.11.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -41,7 +42,7 @@
                         suppressAlertClear  = $false
                     }
 
-                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -Verbose
+                    New-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -Verbose
 
             In this example, the function will create an alert rule called "Error Test" with the specified properties (all required properties are specified). Verbose logging output will be written only to the host.
         .EXAMPLE
@@ -58,11 +59,12 @@
                         suppressAlertClear  = $false
                     }
 
-                    Add-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -LogPath C:\Temp\test.log
+                    New-LogicMonitorAlertRule -AccessID <access ID> -AccessKey <access key> -AccountName <account name> -Settings $Properties -LogPath C:\Temp\test.log
 
             In this example, the function will create an alert rule called "Error Test" with the specified properties (not all required fields are included, causing default values to be used). Limited logging output will be written to C:\Temp\test.log.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorAlertRule")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

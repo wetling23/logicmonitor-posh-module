@@ -76,6 +76,7 @@
             Verbose output is sent to the host.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorDeviceGroup")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,

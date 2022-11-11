@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorWebsite {
+﻿Function New-LogicMonitorWebsite {
     <#
         .DESCRIPTION
             Create a new LogicMonitor website.
@@ -6,22 +6,23 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 16 September 2021
                 - Initial release.
+            V2022.11.11.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
-            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.    
+            Mandatory parameter. Represents the access ID used to connected to LogicMonitor's REST API.
         .PARAMETER AccessKey
             Mandatory parameter. Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Mandatory parameter. Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Properties
-            Mandatory parameter. Represents the properties values of the new DeviceGroup. Required fields are "name" and "parentId". Valid properties can be found at https://www.logicmonitor.com/swagger-ui-master/dist/#/Device%20Groups/addDeviceGroup.
+            Mandatory parameter. Represents the properties values of the new website. Required fields are "name". Valid properties can be found at https://www.logicmonitor.com/support/v3-swagger-documentation#h-api-v3.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
-            Default value is "LogicMonitorPowershellModule" Represents the name of the desired source, for Event Log logging.
-        .PARAMETER BlockLogging
-            When this switch is included, the code will write output only to the host and will not attempt to write to the Event Log.
+            When included, (and when LogPath is null), represents the event log source for the Application log. If no event log source or path are provided, output is sent only to the host.
+        .PARAMETER LogPath
+            When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
             PS C:\> $table = @{
                         name   = "site1"
@@ -31,42 +32,55 @@
                             url = "/"
                         })
                     }
-            PS C:\> Add-LogicMonitorWebsite -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> New-LogicMonitorWebsite -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose
 
-            In this example, the function will create a new Website monitor to webcheck www.google.com. Limited logging is written only to the host.
+            In this example, the function will create a new Website monitor to webcheck www.google.com. Verbose logging is written only to the host.
+        .EXAMPLE
+            PS C:\> $table = @{
+                groupId = 12
+                name    = "site2"
+                type    = "pingcheck"
+                host    = "google.com"
+            }
+            PS C:\> New-LogicMonitorWebsite -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -LogPath C:\Temp\log.txt
+
+            In this example, the function will create a new ping-check monitor to ping google.com. The website will be created in the group with ID 12. Limited logging is written to the host and C:\Temp\log.txt.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorWebsite")]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory)]
-        [hashtable]$Properties,
+        [Hashtable]$Properties,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
     $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-    # Initialize variables.
-    $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding
-    $httpVerb = "POST" # Define what HTTP operation will the script run.
+    #region Setup
+    #region Initilize variables
+    $OutputEncoding = [console]::InputEncoding = [console]::OutputEncoding = New-Object System.Text.UTF8Encoding # I don't remember why this is here. It might not be needed, but I am not removing it right now.
+    $httpVerb = "POST"
     $resourcePath = "/website/websites"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    #endregion Initialize variables
 
-    # Checking for the required properties
+    #region Validate input properties
     If (-NOT($Properties.ContainsKey('name'))) {
         $message = ("{0}: No site name provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
@@ -79,23 +93,27 @@
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('domain'))) {
+    If (-NOT($Properties.ContainsKey('domain')) -and -NOT($Properties.ContainsKey('host'))) {
         $message = ("{0}: No domain name provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
-    If (-NOT($Properties.ContainsKey('steps'))) {
+    If (($Properties.type -eq 'webcheck') -and -NOT($Properties.ContainsKey('steps'))) {
         $message = ("{0}: No steps provided. Please update the provided properties and re-submit the request.")
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
+    #endregion Validate input properties
 
+    #region Encoding data
     $data = ($Properties | ConvertTo-Json -Depth 5)
     $enc = [System.Text.Encoding]::UTF8
     $encdata = $enc.GetBytes($data)
+    #endregion Encoding data
 
+    #region Build command
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
@@ -116,10 +134,11 @@
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
+    #endregion Build command
 
-    # Make Request
+    #region Make request
     $message = ("{0}: Executing the REST query ({1})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
@@ -148,7 +167,8 @@
 
         Return "Error"
     }
+    #endregion Make request
 
     $response
 }
-#1.0.0.0
+#V2022.11.11.0

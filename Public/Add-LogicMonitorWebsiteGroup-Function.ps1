@@ -1,4 +1,4 @@
-﻿Function Add-LogicMonitorWebsiteGroup {
+﻿Function New-LogicMonitorWebsiteGroup {
     <#
         .DESCRIPTION
             Create a new LogicMonitor website group.
@@ -26,7 +26,7 @@
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
             PS C:\> $table = @{name = 'group1'; parentId = 1}
-            PS C:\> Add-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
+            PS C:\> New-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new WebsiteGroup with the following properties:
                 - Name: group1
@@ -43,7 +43,7 @@
                             }
                         )
                     }
-            PS C:\> Add-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
+            PS C:\> New-LogicMonitorWebsiteGroup -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table -Verbose -LogPath log.txt
 
             In this example, the function will create a new WebsiteGroup with the following properties:
                 - Name: group1
@@ -53,6 +53,7 @@
             Verbose output is sent to the host and to log.txt in the current directory.
     #>
     [CmdletBinding()]
+    [Alias("Add-LogicMonitorWebsiteGroup")]
     Param (
         [Parameter(Mandatory)]
         [string]$AccessId,
