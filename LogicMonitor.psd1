@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.2.14'
+    ModuleVersion     = '1.0.2.15'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -59,9 +59,7 @@
 
     # Functions to export from this module
     FunctionsToExport =
-    'Add-EventLogSource', 'Add-LogicMonitorAlertRule', 'Add-LogicMonitorCollector', 'Add-LogicMonitorDashboard',
-    'Add-LogicMonitorDashboardGroup', 'Add-LogicMonitorDashboardWidget', 'Add-LogicMonitorDevice', 'Add-LogicMonitorDeviceGroup',
-    'Add-LogicMonitorReportGroup', 'Add-LogicMonitorWebsite', 'Add-LogicMonitorWebsiteGroup',
+    'Add-EventLogSource',
     'Confirm-OutputPathAvailability',
     'Disable-LogicMonitorLogicModuleInstance',
     'Enable-LogicMonitorLogicModuleInstance',
@@ -75,6 +73,9 @@
     'Get-LogicMonitorJobMonitor', 'Get-LogicMonitorPropertySource', 'Get-LogicMonitorReport', 'Get-LogicMonitorReportGroup',
     'Get-LogicMonitorRawData', 'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorUser', 'Get-LogicMonitorWebsite',
     'Get-LogicMonitorWebsiteGroup', 'Get-LogicMonitorWebsiteProperty',
+    'New-LogicMonitorAlertRule', 'New-LogicMonitorCollector', 'New-LogicMonitorDashboard', 'New-LogicMonitorDashboardGroup',
+    'New-LogicMonitorDashboardWidget', 'New-LogicMonitorDevice', 'New-LogicMonitorDeviceGroup', 'New-LogicMonitorReportGroup',
+    'New-LogicMonitorWebsite', 'New-LogicMonitorWebsiteGroup',
     'Out-PsLogging',
     'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector', 'Remove-LogicMonitorCollectorVersion',
     'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt',
@@ -117,7 +118,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Add-LogicMonitorWebsite to 2022.11.11.0 (support "pingcheck" and changed name to New-LogicMonitorWebsite). Also changed Add-LogicMonitor... to New-LogicMonitor... (keeping existing names as alias).'
+            ReleaseNotes = 'Exported the correct cmdlet names, after name change.'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''
