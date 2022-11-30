@@ -273,7 +273,7 @@ Function Disable-LogicMonitorLogicModuleInstance {
                 }
 
                 If ($response.items) {
-                    $message = ("{0}: Found {1} matching instances. Attempting to enable." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.id.Count)
+                    $message = ("{0}: Found {1} matching instances. Attempting to disable." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.id.Count)
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 } Else {
                     $message = ("{0}: No instances found." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
