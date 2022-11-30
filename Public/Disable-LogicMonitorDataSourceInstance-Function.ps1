@@ -12,6 +12,7 @@ Function Disable-LogicMonitorLogicModuleInstance {
             V2022.06.09.0
             V2022.09.29.0
             V2022.10.27.0
+            V2022.11.30.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -78,7 +79,6 @@ Function Disable-LogicMonitorLogicModuleInstance {
         [Parameter(Mandatory, ParameterSetName = 'Id')]
         [int]$DeviceId,
 
-        [Parameter(Mandatory = $True)]
         [alias('DisableLogicModuleName')]
         [string[]]$LogicModuleName,
 
@@ -347,4 +347,4 @@ Function Disable-LogicMonitorLogicModuleInstance {
     End {
         Return $exitCode
     }
-} #2022.10.27.0
+} #2022.11.30.0
