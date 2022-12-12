@@ -21,7 +21,9 @@
             V1.0.0.8 date: 4 December 2019
             V1.0.0.9 date: 23 July 2020
             V1.0.0.10 date: 2 October 2020
-            V2022.02.21.0
+            V1.0.0.11 date: 12 December 2022
+                - Update by Sven Borer
+                - Fixed filter bug.
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -108,6 +110,7 @@
         # Initialize variables.
         [boolean]$firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all alerts.
         $hashstr = $null # Filter as a string.
+        $filterString = $null
         $sdts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the alerts.
         $response = $null
         $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
@@ -176,24 +179,24 @@
                 foreach ($key in $($filter.keys)) {
                     $hashstr += $key + ":" + "`"$($filter[$key])`"" + ","
                 }
-                $filter = ($hashstr.trimend(',')).Replace("`"", "%22")
+                $filterString = ($hashstr.trimend(',')).Replace("`"", "%22")
             }
         }
 
         # Build the filter, if any of the following conditions are met.
         Switch ($IsEffective, $SdtType) {
             { $_.IsPresent } {
-                $filter += "isEffective:`"True`","
+                $filterString += ",isEffective:`"True`""
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$filterString variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 Continue
             }
             { $_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT' } {
-                $filter += "type:`"$sdtType`","
+                $filterString += ",type:`"$sdtType`""
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+                $message = ("{0}: Updating `$filterString variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
                 If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
                 Continue
@@ -201,14 +204,14 @@
         }
 
         If ($PsCmdlet.ParameterSetName -eq "AdminName") {
-            $filter += "admin:`"$AdminName`","
+            $filterString += ",admin:`"$AdminName`""
 
-            $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+            $message = ("{0}: Updating `$filterString variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
         }
 
-        If (-NOT([string]::IsNullOrEmpty($filter))) {
-            $filter = $filter.TrimEnd(",")
+        If (-NOT([string]::IsNullOrEmpty($filterString))) {
+            $filterString = $filterString.TrimEnd(",")
         }
 
         # Determine how many times "GET" must be run, to return all SDT entries, then loop through "GET" that many times.
@@ -216,11 +219,11 @@
             $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            If ([string]::IsNullOrEmpty($filter)) {
+            If ([string]::IsNullOrEmpty($filterString)) {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
             }
             Else {
-                $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
+                $queryParams = "?filter=$filterString&offset=$offset&size=$BatchSize&sort=id"
             }
 
             $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
@@ -302,4 +305,4 @@
 
         Return $sdts
     }
-} #V2022.02.21.0
+} #V1.0.0.11
