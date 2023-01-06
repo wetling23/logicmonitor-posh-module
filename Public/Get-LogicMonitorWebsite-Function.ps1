@@ -40,6 +40,7 @@
             V1.0.0.16 date: 23 July 2020
             V1.0.0.17 date: 10 May 2021
             V1.0.0.18 date: 30 July 2021
+            V2023.01.06.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -74,6 +75,10 @@
             PS C:\> Get-LogicMonitorwebsite -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name webMonitor1
 
             In this example, the function will search for the website with "webMonitor1" in the name property and will return its properties.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorwebsite -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=groupId:123'
+
+            In this example, the function will return website in the group with ID 123 and will return its/their properties.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllWebsites')]
     [alias('Get-LogicMonitorServices')]
@@ -274,4 +279,4 @@
     Until (($stopLoop -eq $true) -or ($singleWebsiteCheckDone))
 
     $websites
-} #1.0.0.18
+} #2023.01.06.0

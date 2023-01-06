@@ -19,6 +19,7 @@
             V1.0.0.9 date: 19 October 2020
             V1.0.0.10 date: 21 September 2021
             V1.0.0.11 date: 20 June 2022
+            V2023.01.06.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -42,9 +43,9 @@
 
             In this example, the command will change the name of the website with id 6, to 'newName'. Verbose output is sent to the host.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DeviceDisplayName server1 -PropertyTable @{"name"="newName"; "domain"="1.1.1.1"}
+            PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name website1 -PropertyTable @{"name"="newName"; "domain"="1.1.1.1"}
 
-            In this example, the command will change the name of the website with name 'server1, to 'newName' and will update the domain value to 1.1.1.1.
+            In this example, the command will change the name of the website with name 'website1, to 'newName' and will update the domain value to 1.1.1.1.
     #>
     [CmdletBinding(DefaultParameterSetName = 'IdFilter')]
     Param (
@@ -204,4 +205,4 @@
     }
 
     Return $response
-} #1.0.0.11
+} #2023.01.06.0
