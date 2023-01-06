@@ -4,7 +4,7 @@
     RootModule        = 'LogicMonitor.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.0.2.16'
+    ModuleVersion     = '1.0.2.17'
 
     # ID used to uniquely identify this module
     GUID              = '6ef13f0b-48da-4c3b-81b2-03fa464ef8fd'
@@ -16,7 +16,7 @@
     CompanyName       = ''
 
     # Copyright statement for this module
-    Copyright         = '(c) 2022 mhashemi. All rights reserved.'
+    Copyright         = '(c) 2023 mhashemi. All rights reserved.'
 
     # Description of the functionality provided by this module
     Description       = 'LogicMonitor REST API-related functions.'
@@ -118,7 +118,7 @@
             # IconUri = ''
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Disable-LogicMonitorDataSourceInstance to 2022.11.30.0 (removed "mandatory" for LogicModuleName parameter).'
+            ReleaseNotes = 'Updated New-LogicMonitorWebsite to 2023.01.06.0 (logging updates, added notice of the default overallAlertValue when a desired value is not provided).'
 
             # External dependent modules of this module
             # ExternalModuleDependencies = ''

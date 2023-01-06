@@ -7,6 +7,7 @@
             V1.0.0.0 date: 16 September 2021
                 - Initial release.
             V2022.11.11.0
+            V2023.01.06.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -82,28 +83,32 @@
 
     #region Validate input properties
     If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No site name provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No site name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
     If (-NOT($Properties.ContainsKey('type'))) {
-        $message = ("{0}: No check type provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No check type provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
     If (-NOT($Properties.ContainsKey('domain')) -and -NOT($Properties.ContainsKey('host'))) {
-        $message = ("{0}: No domain name provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No domain name provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
     }
     If (($Properties.type -eq 'webcheck') -and -NOT($Properties.ContainsKey('steps'))) {
-        $message = ("{0}: No steps provided. Please update the provided properties and re-submit the request.")
+        $message = ("{0}: No steps provided. Please update the provided properties and re-submit the request." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
         Return "Error"
+    }
+    If (-NOT $Properties.ContainsKey('overallAlertLevel')) {
+        $message = ("{0}: Note that the overallAlertLevel will be set to `"warning`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message -BlockStdErr $BlockStdErr }
     }
     #endregion Validate input properties
 
@@ -153,7 +158,7 @@
             Start-Sleep -Seconds 60
         }
         Else {
-            $message = ("{0}: Unexpected error adding DeviceGroup called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+            $message = ("{0}: Unexpected error adding website called `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
                 Error message: {3}`r
                 Error code: {4}`r
                 Invoke-Request: {5}`r
@@ -170,5 +175,4 @@
     #endregion Make request
 
     $response
-}
-#V2022.11.11.0
+} #2023.01.06.0
