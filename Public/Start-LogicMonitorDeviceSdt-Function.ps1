@@ -27,6 +27,7 @@
             V1.0.0.12 date: 4 December 2019
             V1.0.0.13 date: 23 July 2020
             V1.0.0.14 date: 21 September 2021
+            V2023.01.10.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -166,11 +167,10 @@
         $sdtEnd = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($endDate).ToUniversalTime()).TotalMilliseconds)
 
         If ($PsCmdlet.ParameterSetName -eq "id") {
-            $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Commnet: {4}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $endDate, $Id, $Comment)
+            $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device ID: {3}; Comment: {4}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $endDate, $Id, $Comment)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
-            $data = @{
-                "type"          = "DeviceSDT"
+            $data = @{"type"          = "DeviceSDT"
                 "deviceId"      = $Id
                 "startDateTime" = $sdtStart
                 "endDateTime"   = $sdtEnd
@@ -178,7 +178,7 @@
             }
         }
         Else {
-            $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device name: {3}; Commnet: {4}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $endDate, $DisplayName, $Comment)
+            $message = ("{0}: SDT Start: {1}; SDT End: {2}; Device name: {3}; Comment: {4}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $endDate, $DisplayName, $Comment)
             If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             $data = @{
@@ -254,4 +254,4 @@
 
         Return $response
     }
-} #1.0.0.14
+} #2023.01.10.0
