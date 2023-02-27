@@ -20,6 +20,7 @@
             V1.0.0.27 date: 30 July 2021
             V2022.03.18.0
             V2022.03.18.1
+            V2023.02.27.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -172,7 +173,7 @@
             }
         }
 
-        $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
+        $message = ("{0}: Updated `$queryParams variable in {1}.{2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $(If ($queryParams) { (" The value of `$queryParams is: {0}." -f ($queryParams | Out-String).Trim()) }))
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         If ($firstLoopDone -eq $false) {
@@ -269,4 +270,4 @@
     Until (($devices.id.Count -ge $response.total) -or ($singleDeviceCheckDone))
 
     $devices
-} #V2022.03.18.1
+} #2023.02.27.0

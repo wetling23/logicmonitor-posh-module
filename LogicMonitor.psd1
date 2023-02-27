@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.2.18'
+ModuleVersion = '2023.02.27.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -69,42 +69,42 @@ PowerShellVersion = '5.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Add-EventLogSource', 'Confirm-OutputPathAvailability', 
-               'Disable-LogicMonitorLogicModuleInstance', 
-               'Enable-LogicMonitorLogicModuleInstance', 'Get-LogicMonitorAlert', 
-               'Get-LogicMonitorAuditLog', 'Get-LogicMonitorAlertRule', 
-               'Get-LogicMonitorCollector', 
-               'Get-LogicMonitorCollectorAvailableVersion', 
-               'Get-LogicMonitorCollectorInstaller', 
-               'Get-LogicMonitorCollectorUpgradeHistory', 
-               'Get-LogicMonitorConfigSource', 'Get-LogicMonitorConfigSourceData', 
-               'Get-LogicMonitorDashboard', 'Get-LogicMonitorDashboardGroup', 
-               'Get-LogicMonitorDashboardWidget', 'Get-LogicMonitorDataSource', 
-               'Get-LogicMonitorDataSourceDevice', 'Get-LogicMonitorDevice', 
-               'Get-LogicMonitorDeviceDataSource', 'Get-LogicMonitorDeviceGroup', 
-               'Get-LogicMonitorDeviceGroupProperty', 
-               'Get-LogicMonitorDeviceProperty', 'Get-LogicMonitorDeviceSdt', 
-               'Get-LogicMonitorEscalationChain', 'Get-LogicMonitorEventSource', 
-               'Get-LogicMonitorIntegration', 'Get-LogicMonitorJobMonitor', 
-               'Get-LogicMonitorPropertySource', 'Get-LogicMonitorReport', 
-               'Get-LogicMonitorReportGroup', 'Get-LogicMonitorRawData', 
-               'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorUser', 
-               'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup', 
-               'Get-LogicMonitorWebsiteProperty', 'New-LogicMonitorAlertRule', 
-               'New-LogicMonitorCollector', 'New-LogicMonitorDashboard', 
-               'New-LogicMonitorDashboardGroup', 'New-LogicMonitorDashboardWidget', 
-               'New-LogicMonitorDevice', 'New-LogicMonitorDeviceGroup', 
-               'New-LogicMonitorReportGroup', 'New-LogicMonitorWebsite', 
-               'New-LogicMonitorWebsiteGroup', 'Out-PsLogging', 
-               'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector', 
-               'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDevice', 
-               'Remove-LogicMonitorDeviceProperty', 
-               'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt', 
-               'Send-LogicMonitorLmLogEntry', 'Start-LogicMonitorDeviceSdt', 
-               'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty', 
-               'Update-LogicMonitorCollectorProperty', 
-               'Update-LogicMonitorCollectorVersion', 
-               'Update-LogicMonitorDashboardWidgetProperty', 
+FunctionsToExport = 'Add-EventLogSource', 'Confirm-OutputPathAvailability',
+               'Disable-LogicMonitorLogicModuleInstance',
+               'Enable-LogicMonitorLogicModuleInstance', 'Get-LogicMonitorAlert',
+               'Get-LogicMonitorAuditLog', 'Get-LogicMonitorAlertRule',
+               'Get-LogicMonitorCollector',
+               'Get-LogicMonitorCollectorAvailableVersion',
+               'Get-LogicMonitorCollectorInstaller',
+               'Get-LogicMonitorCollectorUpgradeHistory',
+               'Get-LogicMonitorConfigSource', 'Get-LogicMonitorConfigSourceData',
+               'Get-LogicMonitorDashboard', 'Get-LogicMonitorDashboardGroup',
+               'Get-LogicMonitorDashboardWidget', 'Get-LogicMonitorDataSource',
+               'Get-LogicMonitorDataSourceDevice', 'Get-LogicMonitorDevice',
+               'Get-LogicMonitorDeviceDataSource', 'Get-LogicMonitorDeviceGroup',
+               'Get-LogicMonitorDeviceGroupProperty',
+               'Get-LogicMonitorDeviceProperty', 'Get-LogicMonitorDeviceSdt',
+               'Get-LogicMonitorEscalationChain', 'Get-LogicMonitorEventSource',
+               'Get-LogicMonitorIntegration', 'Get-LogicMonitorJobMonitor',
+               'Get-LogicMonitorPropertySource', 'Get-LogicMonitorReport',
+               'Get-LogicMonitorReportGroup', 'Get-LogicMonitorRawData',
+               'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorUser',
+               'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup',
+               'Get-LogicMonitorWebsiteProperty', 'New-LogicMonitorAlertRule',
+               'New-LogicMonitorCollector', 'New-LogicMonitorDashboard',
+               'New-LogicMonitorDashboardGroup', 'New-LogicMonitorDashboardWidget',
+               'New-LogicMonitorDevice', 'New-LogicMonitorDeviceGroup',
+               'New-LogicMonitorReportGroup', 'New-LogicMonitorWebsite',
+               'New-LogicMonitorWebsiteGroup', 'Out-PsLogging',
+               'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector',
+               'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDevice',
+               'Remove-LogicMonitorDeviceProperty',
+               'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt',
+               'Send-LogicMonitorLmLogEntry', 'Start-LogicMonitorDeviceSdt',
+               'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty',
+               'Update-LogicMonitorCollectorProperty',
+               'Update-LogicMonitorCollectorVersion',
+               'Update-LogicMonitorDashboardWidgetProperty',
                'Update-LogicMonitorDeviceProperty', 'Update-LogicMonitorWebsiteProperty'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -143,7 +143,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Update-LogicMonitorWebsite to 2023.01.06.0 (in-line help). Updated Get-LogicMonitorWebsite to 2023.01.06.0 (added example).'
+            ReleaseNotes = 'Updated Get-LogicMonitor Collector and Get-LogicMonitorDevice to 2023.02.27.0 (logging). Updated Add-LogicMonitorCollector to 2023.02.27.0 (removed the command that writes the collector ID to the registry).'
 
         # Prerelease string of this module
         # Prerelease = ''

@@ -8,6 +8,9 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 2023.02.27.0
+- Add-LogicMonitorCollector
+  - Removed the "write to registry" section.
 ## 1.0.2.11
 - Get-LogicMonitorAlert
   - Added back the option to provide a filter in the form of a hashtable, but added a property of the hashtable, to indicate the desired comparison operator (e.g. '<', '>', ':', '<:', '>:' and note that ':<' is invalid).

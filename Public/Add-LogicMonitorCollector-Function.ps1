@@ -28,6 +28,7 @@
             V1.0.0.11 date: 23 July 2020
             V1.0.0.12 Date: 21 September 2021
             V2022.11.11.0
+            V2023.02.27.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -79,7 +80,6 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Initialize variables.
-    $hklm = 'HKLM:\SYSTEM\CurrentControlSet\Control'
     $httpVerb = "POST" # Define what HTTP operation will the script run.
     $resourcePath = "/setting/collectors"
     $data = "{`"description`":`"$CollectorDisplayName`"}"
@@ -165,31 +165,5 @@
         }
     }
 
-    $message = ("{0}: Attempting to write the collector ID {1} to the registry." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($response.data.id))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    Try {
-        New-ItemProperty -Path $hklm -Name LogicMonitorCollectorID -Value $($response.data.id) -PropertyType String -Force -ErrorAction Stop | Out-Null
-    }
-    Catch {
-        If ($_.Exception.Message -like "*Cannot find path*") {
-            $message = ("{0}: Unable to record {1} to the registry. It appears that the key ({2}) does not exist or the account does not have permission to modify it. {3} will continue." `
-                    -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.data.id, $hklm, $MyInvocation.MyCommand) 
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
-        }
-        Else {
-            $message = ("{0}: Unexpected error recording {1} to the registry. To prevent errors, {2} will exit. If present, the following details were returned:`r`n
-                Error message: {3}`r
-                Error code: {4}`r
-                Invoke-Request: {5}`r
-                Headers: {6}`r
-                Body: {7}" -f
-                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.data.id, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-            )
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
-        }
-    }
-
     Return $response.data.id
-} #1.0.0.12
+} #2023.02.27.0
