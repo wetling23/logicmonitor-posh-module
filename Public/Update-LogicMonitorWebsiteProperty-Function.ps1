@@ -20,6 +20,7 @@
             V1.0.0.10 date: 21 September 2021
             V1.0.0.11 date: 20 June 2022
             V2023.01.06.0
+            V2023.03.01.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -41,11 +42,15 @@
         .EXAMPLE
             PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyTable @{"name"="newName"} -Verbose
 
-            In this example, the command will change the name of the website with id 6, to 'newName'. Verbose output is sent to the host.
+            In this example, the command will change the name of the website with id 6, to 'newName'. Verbose logging output is sent to the host.
         .EXAMPLE
             PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name website1 -PropertyTable @{"name"="newName"; "domain"="1.1.1.1"}
 
-            In this example, the command will change the name of the website with name 'website1, to 'newName' and will update the domain value to 1.1.1.1.
+            In this example, the command will change the name of the website with name 'website1, to 'newName' and will update the domain value to 1.1.1.1. Limitied logging output will be only sent to the host.
+        .EXAMPLE
+            PS C:\> Update-LogicMonitorwebsiteProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyTable @{ testLocation = @{ all = $false; smgIds = @(2, 3, 4) } } -LogPath C:\Temp\log.txt
+
+            In this example, the command will set the list of checkpoint locations to 2, 3, and 4 (US - Washington DC, US - Oregon, and Europe - Dublin). Limited logging is sent to the host and C:\Temp\log.txt.
     #>
     [CmdletBinding(DefaultParameterSetName = 'IdFilter')]
     Param (

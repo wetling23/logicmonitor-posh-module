@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.02.27.0'
+ModuleVersion = '2023.03.01.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -143,7 +143,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitor Collector and Get-LogicMonitorDevice to 2023.02.27.0 (logging). Updated Add-LogicMonitorCollector to 2023.02.27.0 (removed the command that writes the collector ID to the registry).'
+            ReleaseNotes = 'Updated Update-LogicMonitorWebsiteProperty to 2023.03.01.0 (added example command to in-line help).'
 
         # Prerelease string of this module
         # Prerelease = ''
