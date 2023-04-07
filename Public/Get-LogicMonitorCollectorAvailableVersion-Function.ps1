@@ -17,6 +17,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
             V1.0.0.6 date: 18 October 2019
             V1.0.0.7 date: 4 December 2019
             V1.0.0.8 date: 23 July 2020
+            V2023.04.07.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -96,7 +97,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
 
     # Make Request
@@ -135,4 +136,4 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     While ($stopLoop -eq $false)
 
     Return $response.items
-} #1.0.0.8
+} #2023.04.07.0
