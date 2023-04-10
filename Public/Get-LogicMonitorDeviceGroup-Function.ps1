@@ -8,6 +8,7 @@ Function Get-LogicMonitorDeviceGroup {
             V1.0.0.0 date: 8 April 2021
                 - Initial release. Or maybe not, who knows.
             V1.0.0.1 date: 30 July 2021
+            V2023.04.10.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -47,6 +48,10 @@ Function Get-LogicMonitorDeviceGroup {
 
             In this example, the function will search for device groups with "administrator" (a "like" search) as a value in the custom property called "wmi.user". Other valid property lists include systemProperties and inheritedPropreties.
             Note that the quotes around the value are required when the value is a string (and not an integer).
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorDeviceGroup -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Filter "filter=parentId:23|89"
+
+            In this example, the command will return properties for groups with parentId 23 or 89. Limited logging is sent only to the console host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllDeviceGroups')]
     Param (
