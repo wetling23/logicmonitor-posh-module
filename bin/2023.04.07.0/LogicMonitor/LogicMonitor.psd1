@@ -143,7 +143,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitorCollectorAvailableVersion to 2023.04.07.0 (using API v3 now).'
+            ReleaseNotes = 'Updated Get-LogicMonitorEscalationChain to 2023.04.28.0 (using API v3 now, and added support for a string filter). Updated Get-LogicMonitorDashboard to 2023.04.28.0 (using API v3 now).'
 
         # Prerelease string of this module
         # Prerelease = ''
