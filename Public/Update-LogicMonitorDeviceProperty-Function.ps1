@@ -208,7 +208,8 @@
                     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
                 }
 
-                $propertyData += "{`"name`":`"$property`",`"value`":`"$($PropertyValues[$index])`"},"
+                $EscapedString = $PropertyValues[$index] | ConvertTo-Json
+                $propertyData += "{`"name`":`"$property`",`"value`":$($EscapedString)},"
 
                 $index++
             }
