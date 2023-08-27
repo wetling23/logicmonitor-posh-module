@@ -9,6 +9,8 @@ Function Remove-LogicMonitorDeviceGroup {
             V1.0.0.1 date: 15 September 2021
                 - Update by Mike Hahsemi
             V1.0.0.2 date: 30 September 2021
+            V2023.04.28.0
+            V2023.08.23.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -54,32 +56,73 @@ Function Remove-LogicMonitorDeviceGroup {
     [CmdletBinding()]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
-        [int]$Id,
+        [Int]$Id,
 
-        [switch]$HardDelete,
+        [Switch]$HardDelete,
 
-        [switch]$KeepChildren,
+        [Switch]$KeepChildren,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
     Process {
+        #region Setup
+        #region Initialize variables
+        $httpVerb = "DELETE" # Define what HTTP operation will the script run.
+        $resourcePath = "/device/groups/$Id"
+        $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
+        [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+        #endregion Initialize variables
+
+        #region Logging
+        # Setup parameters for splatting.
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{
+                    Verbose = $true
+                }
+            }
+        } Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{}
+            }
+        }
+        #endregion Logging
 
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        #endregion Setup
 
         If ($Id -lt 2) {
             $message = ("{0}: Please specify an Id greater than 1 (Root)." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
@@ -87,12 +130,6 @@ Function Remove-LogicMonitorDeviceGroup {
 
             Return "Error"
         }
-
-        # Initialize variables.
-        $httpVerb = "DELETE" # Define what HTTP operation will the script run.
-        $resourcePath = "/device/groups/$Id"
-        $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
-        [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
         If ($HardDelete) {
             $q1 = "deleteHard=true"
@@ -110,56 +147,58 @@ Function Remove-LogicMonitorDeviceGroup {
 
         $queryParams = "?$q1&$q2"
 
-        # Construct the query URL.
-        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
-
-        # Get current time in milliseconds
+        #region Auth and headers
+        # Get current time in milliseconds.
         $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-        # Concatenate Request Details
         $requestVars = $httpVerb + $epoch + $resourcePath
-
-        # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
         $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-        # Construct Headers
         $headers = @{
             "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
-            "X-Version"     = 2
+            "X-Version"     = 3
         }
+        #endregion Auth and headers
 
-        # Make Request
-        $message = ("{0}: Executing the REST query ({1})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        # Construct the query URL.
+        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-        Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
-        } Catch {
-            If ($_.Exception.Message -match '429') {
-                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+        $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                Start-Sleep -Seconds 60
-            } Else {
-                $message = ("{0}: Unexpected error removing DeviceGroup with id `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
-                    Error message: {3}`r
-                    Error code: {4}`r
-                    Invoke-Request: {5}`r
-                    Headers: {6}" -f
-                    ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Id, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String)
-                )
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+        $stopLoop = $false
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+
+                $stopLoop = $True
+            } Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                    Out-PsLogging @loggingParams -MessageType Warning -Message $message
+
+                    Start-Sleep -Seconds 60
+                } Else {
+                    $message = ("{0}: Unexpected error removing DeviceGroup with id `"{1}`". To prevent errors, {2} will exit. If present, the following details were returned:`r`n
+                Error message: {3}`r
+                Error code: {4}`r
+                Invoke-Request: {5}`r
+                Headers: {6}`r
+                Body: {7}" -f
+                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Id, $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                    Return "Error"
+                }
             }
-
-            Return "Error"
-        }
+        } While ($stopLoop -eq $false)
 
         $response
     }
-} #1.0.0.2
+} #2023.08.23.0

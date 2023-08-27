@@ -20,6 +20,8 @@
             V1.0.0.7 date: 18 October 2019
             V1.0.0.8 date: 4 December 2019
             V1.0.0.9 date: 23 July 2020
+            V2023.04.28.0
+            V2023.08.24.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -55,109 +57,200 @@
     [alias('Get-LogicMonitorDeviceGroupProperties')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
-        [int]$GroupID,
+        [Alias('GroupId')]
+        [Int[]]$Id,
 
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
-        [string]$GroupName,
+        [Alias('GroupName')]
+        [String]$Name,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Initialize variables.
+    #region Setup
+    #region Initialize variables
+    $groupProps = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the group properties.
     $httpVerb = "GET" # Define what HTTP operation will the script run.
-    $resourcePath = "/device/groups"
     $queryParams = $null
+    $batchSize = 1000
+    $offset = 0
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    $message = ("{0}: Retrieving group properties. The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+    $commandParams = @{
+        AccountName = $AccountName
+        AccessId    = $AccessId
+        AccessKey   = $AccessKey
+    }
+    #endregion Initialize variables
+
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{
+                Verbose = $true
+            }
+        }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
+    }
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
+
+    $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Update $resourcePath to filter for a specific device.
     Switch ($PsCmdlet.ParameterSetName) {
         "NameFilter" {
-            $group = Get-LogicMonitorDeviceGroups -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -GroupName $GroupName -EventLogSource $EventLogSource
+            $group = Get-LogicMonitorDeviceGroup @commandParams -Name $Name @loggingParams
 
-            $groupId = $group.id
+            If ($group.id) {
+                $group | ForEach-Object { [Int[]]$Id += $_.id }
+            } Else {
+                $message = ("{0}: No groups were retrieved using the provided name, see the cmdlet's logging for more details. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                Return "Error"
+            }
         }
     }
 
-    $resourcePath += "/$groupId/properties"
+    Foreach ($group in $Id) {
+        $resourcePath = ("/device/groups/{0}/properties" -f $group)
 
-    # Construct the query URL.
-    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+        #region Auth and headers
+        # Get current time in milliseconds.
+        $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
+        $requestVars = $httpVerb + $epoch + $resourcePath
+        $hmac = New-Object System.Security.Cryptography.HMACSHA256
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
+        $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
+        $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
+        $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-    # Concatenate Request Details
-    $requestVars = $httpVerb + $epoch + $resourcePath
-
-    # Construct Signature
-    $hmac = New-Object System.Security.Cryptography.HMACSHA256
-    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
-    $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
-    $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
-    $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
-
-    # Construct headers
-    $headers = @{
-        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
-        "Content-Type"  = "application/json"
-        "X-Version"     = 2
-    }
-
-    # Make request
-    $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
-    }
-    Catch {
-        If ($_.Exception.Message -match '429') {
-            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
-
-            Start-Sleep -Seconds 60
+        $headers = @{
+            "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 3
         }
-        Else {
-            $message = ("{0}: Unexpected error getting device group property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                Error message: {2}`r
-                Error code: {3}`r
-                Invoke-Request: {4}`r
-                Headers: {5}`r
-                Body: {6}" -f
-                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-            )
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+        #endregion Auth and headers
 
-            Return "Error"
-        }
+        Do {
+            $queryParams = "?offset=$offset&size=$batchSize&sort=id"
+
+            # Construct the query URL.
+            $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+
+            $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+            $stopLoop = $false
+            Do {
+                Try {
+                    $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+
+                    $stopLoop = $True
+                } Catch {
+                    If ($_.Exception.Message -match '429') {
+                        $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
+
+                        Start-Sleep -Seconds 60
+                    } ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                        $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                        Return "Error"
+                    } Else {
+                        $message = ("{0}: Unexpected error getting device group properties. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        )
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                        Return "Error"
+                    }
+                }
+            } While ($stopLoop -eq $false)
+
+            If ($response.items.Count -gt 0) {
+                $message = ("{0}: Retrieved {1} properties of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                Foreach ($item in $response.items) {
+                    $groupProps.Add($item)
+                }
+
+                If (($response.items.Count -eq 1) -or ($response.total -and ($response.total -eq $groupProps.id.Count))) {
+                    $message = ("{0}: Retrieved all properties." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                    $stopLoop = $true
+                } Else {
+                    # Increment offset, to grab the next batch of devices.
+                    $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchSize)
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                    $offset += $batchSize
+                    $stopLoop = $false
+                }
+            } ElseIf ($response.id) {
+                $groupProps = $response
+                $stopLoop = $true
+            } Else {
+                $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                $stopLoop = $true
+            }
+
+            $message = ("{0}: There are {1} properties in `$groupProps." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $groupProps.id.Count)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        } Until ($stopLoop -eq $true)
+
+        $groupProps
     }
-
-    Return $response.items
-} #1.0.0.9
+} #2023.08.24.0

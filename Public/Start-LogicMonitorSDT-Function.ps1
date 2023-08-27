@@ -20,6 +20,7 @@ Function Start-LogicMonitorSDT {
             V1.0.0.5 date: 4 December 2019
             V1.0.0.6 date: 23 July 2020
             V1.0.0.7 date: 21 September 2021
+            V2023.04.28.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -91,18 +92,50 @@ Function Start-LogicMonitorSDT {
     )
 
     Begin {
-        #Request Info
+        #region Initialize variables
         $httpVerb = 'POST'
         $resourcePath = "/sdt/sdts"
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-
-        # Regular expression to validate that the provided SDT duration was formatted correctly.
-        $regex = '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$'
+        $regex = '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$' # Regular expression to validate that the provided SDT duration was formatted correctly.
+        #endregion Initialize variables
     }
     Process {
+        #region Logging
+        # Setup parameters for splatting.
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{
+                    Verbose = $true
+                }
+            }
+        } Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{}
+            }
+        }
+        #endregion Logging
+
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         While ($Duration -notmatch $regex) {
             $message = ("{0}: The value for duration ({1}) is invalid. Please provide a valid SDT duration." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Duration)
@@ -184,9 +217,9 @@ Function Start-LogicMonitorSDT {
 
         # Construct Headers
         $headers = @{
-            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
-            "X-Version"     = 2
+            "X-Version"     = 3
         }
 
         # Make Request
@@ -221,4 +254,4 @@ Function Start-LogicMonitorSDT {
 
         $response
     }
-} #1.0.0.7
+} #2023.04.28.0

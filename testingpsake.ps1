@@ -1,5 +1,5 @@
 properties {
-    $repoPath = "C:\codeRepository\Public.LogicMonitor.PowerShellModule"
+    $repoPath = "C:\codeRepository\personal\logicmonitor-posh-module"
     $manifest = Import-PowerShellDataFile -Path $repoPath\LogicMonitor.psd1
     $outputPath = "$repoPath\bin\$($manifest.ModuleVersion)\LogicMonitor"
     $srcPsd1 = "$repoPath\LogicMonitor.psd1"

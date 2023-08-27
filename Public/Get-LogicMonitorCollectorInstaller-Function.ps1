@@ -46,6 +46,9 @@
             V1.0.0.19 date: 18 October 2019
             V1.0.0.20 date: 4 December 2019
             V1.0.0.21 date: 23 July 2020
+            V2023.04.28.0
+            V2023.06.12.0
+            V2023.08.27.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -71,41 +74,41 @@
         .EXAMPLE
             PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Hostname "server1" -Verbose
 
-            In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector "server1". The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe. Verbose output is sent to the host.
+            In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector "server1". The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe. Verbose logging output is sent only to the host.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11"
+            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11
+
+            In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector 11. The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe. Limited logging output is sent only to the host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11 -Async
 
             In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector 11. The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe.
-        .EXAMPLE
-            PS C:\> Get-LogicMonitorCollectorInstaller -AccessID <access id> -AccessKey <access key> -Account <account name> -Id 11 -Async"
-
-            In this example, the cmdlet connects to LogicMonitor and downloads the 64-bit Windows installer for collector 11. The file is saved to C:\users\<username>\AppData\Temp\lmInstaller.exe.
-            The cmdlet will continue (and exit) while the download is in progress.
+            The cmdlet will continue (and exit) while the download is in progress. Limited logging output is sent only to the host.
     #>
     [CmdletBinding(DefaultParameterSetName = "Default")]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = "Default")]
         [Alias("CollectorID")]
-        [int]$Id,
+        [Int]$Id,
 
         [Parameter(Mandatory, ParameterSetName = "Name")]
         [Alias("CollectorHostName")]
-        [string]$Hostname,
+        [String]$Hostname,
 
         [ValidateSet("nano", "small", "medium", "large")]
-        [string]$Size = "medium",
+        [String]$Size = "medium",
 
         [ValidateSet("Win32", "Win64", "Linux32", "Linux64")]
-        [string]$Os = "Win64",
+        [String]$Os = "Win64",
 
         [ValidateScript( {
                 If (-Not ($_ | Test-Path) ) {
@@ -118,35 +121,77 @@
             })]
         [System.IO.FileInfo]$OutputPath = $env:TEMP,
 
-        [switch]$Async,
+        [Switch]$Async,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Initialize variables.
+    #region Setup
+    #region Initialize variables
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+    $commandParams = @{
+        AccessId    = $AccessId
+        AccessKey   = $AccessKey
+        AccountName = $AccountName
+    }
+    #endregion Initialize variables
+
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{
+                Verbose = $true
+            }
+        }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
+    }
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
     Switch ($PsCmdlet.ParameterSetName) {
         Default {
             $resourcePath = "/setting/collector/collectors/$Id/installers/$Os"
             $queryParams = "?monitorOthers=true&collectorSize=$Size"
         }
-        Name {
+        'Name' {
             Try {
                 $message = ("{0}: Attempting to retrieve the collector ID from LogicMonitor." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.Exception.Message)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 # LogicMonitor for the collector hostname and return the id property value, for the one collector matching the desired hostname.
-                $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -Hostname $Hostname
+                $collector = Get-LogicMonitorCollectors @commandParams -Hostname $Hostname @loggingParams
             }
             Catch {
                 $message = ("{0}: Unexpected error retrieving the collector Id from LogicMonitor. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
@@ -158,14 +203,14 @@
                     ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                     ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                 )
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
 
-            If ($collector.Id -as [int]) {
+            If ($collector.Id -as [Int]) {
                 $message = ("{0}: The ID property of {1} is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Hostname, $collector.Id)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 $resourcePath = "/setting/collectors/$($collector.Id)/installers/$Os"
                 $queryParams = "?monitorOthers=true&collectorSize=$Size"
@@ -173,7 +218,7 @@
             Else {
                 $message = ("{0}: The search of LogicMonitor for {1}'s collector ID value returned a non-number. The value is: {2}. To prevent errors, {3} will exit." -f `
                         ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Hostname, $collector.Id, $MyInvocation.MyCommand)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
@@ -183,38 +228,35 @@
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-    # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-    # Concatenate Request Details
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
     $requestVars = $httpVerb + $epoch + $resourcePath
-
-    # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Create the web client object and add headers
     $webClient = New-Object System.Net.WebClient
-    $webClient.Headers.Add("Authorization", "LMv1 $accessId`:$signature`:$epoch")
-    $webClient.Headers.Add("Content-Type", 'application/json')
-    $webClient.Headers.Add("X-Version", '2')
+    $webClient.Headers.Add('Authorization', "LMv1 $AccessId`:$signature`:$epoch")
+    $webClient.Headers.Add('Content-Type', 'application/json')
+    $webClient.Headers.Add('X-Version', '3')
+    #endregion Auth and headers
 
     # Make Request
     Switch ($Async) {
         $True {
             $message = ("{0}: Beginning download of the LogicMonitor Collector installer to {1}. {2} will continue while the download is in progress." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $OutputPath, $MyInvocation.MyCommand)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             Try {
                 $webClient.DownloadFileAsync($url, "$($OutputPath.FullName)\lmInstaller.exe")
-                Register-ObjectEvent -InputObject $webClient -EventName DownloadFileCompleted -SourceIdentifier WebClient.DownloadFileComplete -Action { Unregister-Event -SourceIdentifier WebClient.DownloadFileComplete; $webClient.Dispose(); }
+                $null = Register-ObjectEvent -InputObject $webClient -EventName DownloadFileCompleted -SourceIdentifier WebClient.DownloadFileComplete -Action { Unregister-Event -SourceIdentifier WebClient.DownloadFileComplete; $webClient.Dispose(); }
             }
             Catch {
                 $message = ("{0}: Unexpected error downloading the LogicMonitor Collector installer. The specific error is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.Exception.Message)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
@@ -223,7 +265,7 @@
         }
         $False {
             $message = ("{0}: Beginning download of the LogicMonitor Collector installer to {1}. {2} will continue when the download is complete." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $OutputPath, $MyInvocation.MyCommand)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             Try {
                 $webClient.DownloadFile($url, "$($OutputPath.FullName)\lmInstaller.exe")
@@ -231,24 +273,24 @@
             }
             Catch {
                 $message = ("{0}: Unexpected error downloading the LogicMonitor Collector installer. The specific error is: {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $_.Exception.Message)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
 
             If ((Test-Path -Path "$($OutputPath.FullName)\lmInstaller.exe") -and ((Get-Item -Path "$($OutputPath.FullName)\lmInstaller.exe").Length -gt 10MB)) {
                 $message = ("{0}: The LogicMonitor installer was downloaded. Returning the download path." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 Return "$($OutputPath.FullName)\lmInstaller.exe"
             }
             Else {
                 $message = ("{0}: There was no detectable error downloading the LogicMonitor installer, but it is not present in the download location ({1}). To prevent errors, the function {2} will exit" `
                         -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $OutputPath, $MyInvocation.MyCommand)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
         }
     }
-} #1.0.0.21
+} #2023.08.27.0

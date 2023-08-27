@@ -1,3 +1,4 @@
+<# Deprecated, do not use. #>
 Function Update-LogicMonitorAlertRuleProperty {
     <#
         .DESCRIPTION
@@ -82,10 +83,7 @@ Function Update-LogicMonitorAlertRuleProperty {
     )
 
     Begin {
-        $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-        # Initialize variables.
+        #region Initialize variables
         [int]$index = 0
         [hashtable]$propertyData = @{ }
         [string]$data = ""
@@ -94,48 +92,45 @@ Function Update-LogicMonitorAlertRuleProperty {
         [string]$resourcePath = "/setting/alert/rules"
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+        #endregion Initialize variables
 
-        # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+        #region Logging
+        # Setup parameters for splatting.
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
             If ($EventLogSource -and (-NOT $LogPath)) {
-                $commandParams = @{
+                $loggingParams = @{
                     Verbose        = $true
                     EventLogSource = $EventLogSource
                 }
-            }
-            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-                $commandParams = @{
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
                     Verbose = $true
                     LogPath = $LogPath
                 }
-            }
-            Else {
-                $commandParams = @{
+            } Else {
+                $loggingParams = @{
                     Verbose = $true
                 }
             }
-        }
-        Else {
+        } Else {
             If ($EventLogSource -and (-NOT $LogPath)) {
-                $commandParams = @{
-                    Verbose        = $false
+                $loggingParams = @{
                     EventLogSource = $EventLogSource
                 }
-            }
-            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-                $commandParams = @{
-                    Verbose = $false
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
                     LogPath = $LogPath
                 }
-            }
-            Else {
-                $commandParams = @{
-                    Verbose = $false
-                }
+            } Else {
+                $loggingParams = @{}
             }
         }
+        #endregion Logging
     }
     Process {
+        $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
         $message = ("{0} is deprecated, in favor of Update-LogicMonitorAlertRule." -f $MyInvocation.MyCommand)
         If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
 

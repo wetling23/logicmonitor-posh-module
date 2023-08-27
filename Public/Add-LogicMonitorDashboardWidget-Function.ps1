@@ -9,6 +9,8 @@
             V1.0.0.1 date: 16 March 2021
             V1.0.0.2 date: 18 March 2021
             V1.0.0.3 date: 21 September 2021
+            V2023.06.07.0
+            V2023.08.25.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -58,91 +60,114 @@
     [Alias("Add-LogicMonitorDashboardWidget")]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory)]
-        [hashtable]$Properties,
+        [Hashtable]$Properties,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
+    #region Setup
     # Initialize variables.
     $httpVerb = "POST" # Define what HTTP operation will the script run.
     $resourcePath = "/dashboard/widgets"
+    $requiredProps = @('name', 'dashboardId', 'type')
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{
+                Verbose = $true
+            }
+        }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
+    }
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
+
+    #region Validate input properties
     # Checking for the required properties
-    If (-NOT($Properties.ContainsKey('name'))) {
-        $message = ("{0}: No widget name provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+    Foreach ($prop in $requiredProps) {
+        If (-NOT($Properties.Contains($prop))) {
+            $message = ("{0}: Missing required property: {1}. Please update the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $prop)
+            Out-PsLogging @loggingParams -MessageType Error -Message $message
 
-        Return "Error"
+            Return "Error"
+        }
     }
-    If (-NOT($Properties.ContainsKey('dashboardId'))) {
-        $message = ("{0}: No dashboard ID provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+    #endregion Validate input properties
 
-        Return "Error"
-    }
-    If (-NOT($Properties.ContainsKey('type'))) {
-        $message = ("{0}: No widget type provided. Please update the provided properties and re-submit the request.")
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
-
-        Return "Error"
-    }
-
-    $data = ($Properties | ConvertTo-Json)
-    $enc = [System.Text.Encoding]::UTF8
-    $encdata = $enc.GetBytes($data)
+    #region Execute REST query
+    $data = ($Properties | ConvertTo-Json -Depth 5)
 
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-    # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
+    $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-    # Concatenate Request Details
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
-
-    # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
     $headers = @{
-        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
-
-    # Make Request
-    $message = ("{0}: Executing the REST query ({1})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #endregion Auth and headers
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     }
     Catch {
         If ($_.Exception.Message -match '429') {
             $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+            Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
             Start-Sleep -Seconds 60
         }
@@ -157,12 +182,23 @@
                 Headers: {5}" -f
                 ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Properties.Name, $errormsg, $errorcode, $_.Exception.Message, ($headers | Out-String)
             )
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+            Out-PsLogging @loggingParams -MessageType Error -Message $message
         }
 
         Return "Error"
     }
 
-    $response
-}
-#1.0.0.3
+    #region Output
+    If ($response.id) {
+        $message = ("{0}: Successfully created the dashboard widget in LogicMonitor." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    } Else {
+        $message = ("{0}: Unexpected error creating an dashboard widget in LogicMonitor. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+        Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+        Return "Error"
+    }
+
+    Return $response
+    #endregion Output
+} #2023.08.25.0

@@ -6,6 +6,7 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 12 December 2016
             V2022.10.24.0
+            V2023.05.23.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -18,10 +19,13 @@
             Represents the device ID of a monitored device.
         .PARAMETER DisplayName
             Represents the device's display name.
-        .PARAMETER PropertyName
-            Represents the name of the target property. Note that LogicMonitor properties are case sensitive.
-        .PARAMETER PropertyValue
-            Represents the value of the target property.
+        .PARAMETER Name
+            Represents the devices's name (IP or FQDN), as specified in LogicMonitor.
+        .PARAMETER Operation
+            Represents the type of operation to execute.
+            - "Add" indicates that the properties included in the payload will be added, but all existing properties will remain the same. If the property exists already, it will not be updated.
+            - "Update" indicates that the properties included in the request payload will be added if they don’t already exist, or updated if they do already exist, but all other existing properties will remain the same. LogicMonitor refers to this as "replace".
+            - "Replace" indicates that the properties will be replaced with those included in the request payload. LogicMonitor refers to this as "refresh".
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
@@ -29,76 +33,86 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyNames Location,AssignedTeam -PropertyValues Denver,Finance -Verbose
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ customProperties = @(@{ name = 'location'; value = 'Denver' }, @{ name = 'assignedTeam'; value = 'finance' }) } -Operation Add
 
-            In this example, the function will update the Location and AssignedTeam properties for the device with "6" in the ID property. The location will be set to "Denver" and the assigned team will be "Finance". If the properties are not present, they will be added. Verbose output is sent to the host.
+            In this example, the cmdlet will attempt to add the location and assignedTeam properties to the device with ID 6. If one or both exist, the existing values will NOT be updated. Limited logging output will be written to the host only.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -DisplayName server1 -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ customProperties = @(@{ name = 'location'; value = 'Denver'}, @{ name = 'assignedTeam'; value = 'finance' }) } -Operation Update
 
-            In this example, the function will update the Location property for the device with "server1" in the displayName property. The location will be set to "Denver". If the property is not present, it will be added.
+            In this example, the cmdlet will attempt to add or update the location and assignedTeam properties to the device with ID 6. If one or both exist, the existing values WILL be updated. Limited logging output will be written to the host only.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name 10.0.0.0 -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ customProperties = @(@{ name = 'location'; value = 'Denver' }, @{ name = 'assignedTeam'; value = 'finance' }) } -Operation Replace -Verbose
 
-            In this example, the function will update the Location property for the device with "10.0.0.0" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
+            In this example, the cmdlet will attempt to add the location and assignedTeam properties to the device with ID 6. All other custom properties will be removed. Verbose logging output will be written to the host only.
         .EXAMPLE
-            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name server1.domain.local -PropertyNames Location -PropertyValues Denver
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ displayName = "<new device display name>"; description = "<new or updated description>"; customProperties = @(@{ name = "addr"; value = "127.0.0.1" }) } -Operation Update -Verbose
 
-            In this example, the function will update the Location property for the device with "server1.domain.local" in the name property. The location will be set to "Denver". If the property is not present, it will be added.
+            In this example, the cmdlet will attempt to add or update the addr property to the device with ID 6. The cmdlet will also attempt to update the displayName and description properties. If any of the properties exist, the existing values WILL be updated. Verbose logging output will be written to the host only.
+        .EXAMPLE
+            PS C:\> Update-LogicMonitorDeviceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ customProperties = @(@{ name = 'location'; value = '' }) } -Operation Update -Verbose
+
+            In this example, the cmdlet will attempt to add or update the location property to the device with ID 6. The value will be set to a blank string (the property will not be removed). Verbose logging output will be written to the host only.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     [alias('Update-LogicMonitorDeviceProperties')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [Securestring]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'Default')]
         [Alias("DeviceId")]
-        [int]$Id,
+        [Int]$Id,
 
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
         [Alias("DeviceDisplayName")]
-        [string]$DisplayName,
+        [String]$DisplayName,
 
         [Parameter(Mandatory, ParameterSetName = 'IPFilter')]
         [Alias("DeviceName")]
-        [string]$Name,
+        [String]$Name,
 
         [Parameter(Mandatory)]
-        [string[]]$PropertyNames,
+        [Hashtable]$Properties,
 
         [Parameter(Mandatory)]
-        [string[]]$PropertyValues,
+        [ValidateSet('Add', 'Update', 'Replace')]
+        [String]$Operation,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
+    #region Setup
     #region Initialize variables
-    [int]$index = 0
-    $propertyData = ""
-    $standardProperties = ""
-    $data = ""
     $httpVerb = 'PATCH'
-    $queryParams = "?patchFields="
     $resourcePath = "/device/devices"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+
+    Switch ($Operation) {
+        "Add" {
+            $queryParams = "?opType=add"
+        }
+        "Update" {
+            $queryParams = "?opType=replace"
+        }
+        "Replace" {
+            $queryParams = "?opType=refresh"
+        }
+    }
     #endregion Initialize variables
 
-    #region Logging splatting
-    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    #region Logging
+    # Setup parameters for splatting.
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
             $loggingParams = @{
@@ -118,21 +132,21 @@
     } Else {
         If ($EventLogSource -and (-NOT $LogPath)) {
             $loggingParams = @{
-                Verbose        = $false
                 EventLogSource = $EventLogSource
             }
         } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
             $loggingParams = @{
-                Verbose = $false
                 LogPath = $LogPath
             }
         } Else {
-            $loggingParams = @{
-                Verbose = $false
-            }
+            $loggingParams = @{}
         }
     }
-    #endregion Logging splatting
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
     #region Set resource path
     # Update $resourcePath to filter for a specific device, when a device ID, name, or displayName is provided by the user.
@@ -176,80 +190,12 @@
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
     #endregion Set resource path
 
-    #region Parse properties
-    # For each property, assign the name and value to $propertyData.
-    $PropertyValues = $PropertyValues.Replace('\', '\\')
-    Foreach ($property in $PropertyNames) {
-        Switch ($property) {
-            { $_ -in ("name", "displayName", "preferredCollectorId", "hostGroupIds", "description", "disableAlerting", "link", "enableNetflow", "netflowCollectorId") } {
-                $queryParams += "$property,"
-
-                $message = ("{0}: Added {1} to `$queryParams. The new value of `$queryParams is: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property, $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                $message = ("{0}: Updating/adding standard property: {1} with a value of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property, $($PropertyValues[$index]))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                $standardProperties += "`"$property`":`"$($PropertyValues[$index])`","
-
-                $index++
-            }
-            Default {
-                $customProps = $True
-
-                $message = ("{0}: Found that there is a custom property present." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                If ($property -like "*pass") {
-                    $message = ("{0}: Updating/adding property: {1} with a value of ********." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                } Else {
-                    $message = ("{0}: Updating/adding property: {1} with a value of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $property, $($PropertyValues[$index]))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-
-                $propertyData += "{`"name`":`"$property`",`"value`":`"$($PropertyValues[$index])`"},"
-
-                $index++
-            }
-        }
-    }
-
-    If ($customProps -eq $True) {
-        $queryParams += "customProperties&opType=replace"
-    } Else {
-        $queryParams = $queryParams.TrimEnd(",")
-        $queryParams += "&opType=replace"
-    }
-
-    # Trim the trailing comma.
-    $propertyData = $propertyData.TrimEnd(",")
-
-    $standardProperties = $standardProperties.TrimEnd(",")
-
-    If (($standardProperties.Length -gt 0) -and ($propertyData.Length -gt 0)) {
-        $message = ("{0}: The length of `$standardProperties is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $standardProperties.Length)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-        # Assign the entire string to the $data variable.
-        $data = "{$standardProperties,`"customProperties`":[$propertyData]}"
-    } ElseIf (($standardProperties.Length -gt 0) -and ($propertyData.Length -le 0)) {
-        $data = "{$standardProperties}"
-    } Else {
-        # Assign the entire string to the $data variable.
-        $data = "{`"customProperties`":[$propertyData]}"
-    }
-    #endregion Parse properties
-
-    #region REST auth
-    $enc = [System.Text.Encoding]::UTF8
-    $encdata = $enc.GetBytes($data)
-
-    $message = ("{0}: Finished updating `$data. The value update is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Construct the query URL.
+    #region Prepare query
+    $data = $($Properties | ConvertTo-Json -Depth 5)
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
+
+    $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     # Get current time in milliseconds
     $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
@@ -264,19 +210,20 @@
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
+    # Construct headers.
     $headers = @{
         "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
+        "X-Version"     = 3
     }
-    #endregion REST auth
+    #endregion Prepare query
 
-    #region REST command
+    #region Run query
     $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
     Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
     } Catch {
         If ($_.Exception.Message -match '429') {
             $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
@@ -295,15 +242,10 @@
             )
             If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
 
-            Return "Error", $response
+            Return "Error"
         }
     }
-    #endregion REST command
-
-    If ($response.status -ne "200") {
-        $message = ("{0}: LogicMonitor reported an error (status {1}). The message is: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.status, $response.errmsg)
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
-    }
+    #endregion Parse properties
 
     Return $response
-} #2022.10.24.0
+} #2023.05.23.0

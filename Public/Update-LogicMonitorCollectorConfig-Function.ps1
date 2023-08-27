@@ -1,3 +1,4 @@
+##- this is not published yet. maybe it should not be?
 Function Update-LogicMonitorCollectorConfig {
     <#
         .DESCRIPTION
@@ -6,6 +7,7 @@ Function Update-LogicMonitorCollectorConfig {
             Author: Mike Hashemi
             V1.0.0.0 date: 18 January 2022
                 - Initial release.
+            V2023.05.22.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -14,11 +16,12 @@ Function Update-LogicMonitorCollectorConfig {
             Represents the access key used to connected to LogicMonitor's REST API.
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
-        .PARAMETER CollectorId
+        .PARAMETER Id
             Represents the collector's ID.
         .PARAMETER DisplayName
             Represents the collectors description.
-
+        .PARAMETER Properties
+            Hash table of collector properties supported by LogicMonitor.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
         .PARAMETER EventLogSource
@@ -30,7 +33,7 @@ Function Update-LogicMonitorCollectorConfig {
         .EXAMPLE
             PS C:\> Update-LogicMonitorCollectorProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Verbose
 
-            In this example, the cmdlet will 
+            In this example, the cmdlet will ##-- update examples
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
@@ -51,7 +54,8 @@ Function Update-LogicMonitorCollectorConfig {
         [Alias("CollectorDisplayName")]
         [string]$DisplayName,
 
-
+        [Parameter(Mandatory)]
+        [hashtable]$Properties,
 
         [boolean]$BlockStdErr = $false,
 
@@ -60,60 +64,54 @@ Function Update-LogicMonitorCollectorConfig {
         [string]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Initialize variables.
+    #region Setup
+    #region Initialize variables
     [int]$index = 0
     [hashtable]$propertyData = @{}
     [string]$httpVerb = "POST"
     [string]$resourcePath = "/setting/collector/collectors/3/services/restart"
     [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
-
     [regex]$regex = "pdh.collect.preferredMethod=csharp"
     $a.sbproxyconf = $a.sbproxyconf | ForEach-Object { $_ -replace $regex, "pdh.collect.preferredMethod=native" }
+    #region Initialize variables
 
-    
-    # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+    #region Logging
+    # Setup parameters for splatting.
     If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
                 Verbose        = $true
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 Verbose = $true
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
+        } Else {
+            $loggingParams = @{
                 Verbose = $true
             }
         }
-    }
-    Else {
+    } Else {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
-                Verbose        = $false
+            $loggingParams = @{
                 EventLogSource = $EventLogSource
             }
-        }
-        ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
-                Verbose = $false
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
                 LogPath = $LogPath
             }
-        }
-        Else {
-            $commandParams = @{
-                Verbose = $false
-            }
+        } Else {
+            $loggingParams = @{}
         }
     }
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #region Setup
 
     # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
     $data = ([PSCustomObject]@{

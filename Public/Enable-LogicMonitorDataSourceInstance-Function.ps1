@@ -8,6 +8,7 @@ Function Enable-LogicMonitorLogicModuleInstance {
             V2022.06.09.0
             V2022.09.29.0
             V2022.10.25.0
+            V2023.06.12.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -56,7 +57,7 @@ Function Enable-LogicMonitorLogicModuleInstance {
             In this example, the commands will:
             1. Get a list of all LogicModules applied to the device with ID 18
             2. Filter the returned list, for the snmp64-if- DataSource
-            3. Use the device-specific ID of snmp64-if- to disable instances with ID equal to 46 or 2334 (note that this "or" is a logical "and", since both will be disabled).
+            3. Use the device-specific ID of snmp64-if- to enable instances with ID equal to 46 or 2334 (note that this "or" is a logical "and", since both will be enabled).
 
             Limited logging output is sent to the host only.
     #>
@@ -101,20 +102,15 @@ Function Enable-LogicMonitorLogicModuleInstance {
         [String]$LogPath
     )
 
-    Begin {
-        $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Info -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType First -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Info -Message $message }
-    }
+    Begin {}
     Process {
         #region Setup
         #region Variables
         $offset = 0
         $httpVerb = 'GET'
-        $exitCode = 0
+        $exitCode = $null
         $dataSources = [System.Collections.Generic.List[PSObject]]::new()
-        $pattern1 = '[^a-zA-Z\d\s]' # Match any non-alpha numeric or white space character.
-        $pattern2 = '(?:>:|<:|:|>|<|!:|:|~|!~)(?:")(.*?)(?:")' # Allow us to replace characters in the filter. We will leave some of the characters alone, since they are used by the API in certain spots. For example, ":" means equal between the property name and value but should be replaced in the value portion of the pair.
-        $regex = [Regex]::new($pattern2)
+        $appliedLogicModules = [System.Collections.Generic.List[PSObject]]::new()
 
         If ($DeviceId) {
             $device = [PSCustomObject]@{
@@ -123,26 +119,67 @@ Function Enable-LogicMonitorLogicModuleInstance {
         }
         #endregion Variables
 
-        #region Validate instance filter
-        If ($Filter -match $pattern1) {
-            $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-            $regex.Matches($Filter) | ForEach-Object {
-                $Filter = $Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value))
+        #region Logging
+        # Setup parameters for splatting.
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{
+                    Verbose = $true
+                }
             }
+        } Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{}
+            }
+        }
+        #endregion Logging
+
+        $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+        #region Validate instance filter
+        If ($Filter) {
+            $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+            $Filter = [regex]::Replace(
+                $Filter,
+                '(?<=[:|><~]").*?(?=")',
+                {
+                    param($m)
+                    [Uri]::EscapeDataString($m.Value)
+                }
+            )
 
             $Filter = $Filter -replace '\?Filter='
 
             $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
         }
         #endregion Validate instance filter
         #endregion Setup
 
         #region Get LogicModules
         $message = ("{0}: Attempting to get LogicModules from {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $(If ($Device.displayName) { $Device.displayName } Else { $Device.id }))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         Do {
             $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
@@ -150,33 +187,30 @@ Function Enable-LogicMonitorLogicModuleInstance {
 
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-            # Get current time in milliseconds
+            #region Auth and headers
+            # Get current time in milliseconds.
             $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-            # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
-
-            # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
             $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-            # Construct Headers
             $headers = @{
                 "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
                 "X-Version"     = 3
             }
+            #endregion Auth and headers
 
             Try {
                 $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
             } Catch {
                 $message = ("{0}: Unexpected error getting LogicModules applied to {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $(If ($Device.displayName) { $Device.displayName } Else { $Device.id }), $_.Exception.Message)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
-                Return 1
+                Return "Error"
             }
 
             If ($response.data.items) {
@@ -193,108 +227,103 @@ Function Enable-LogicMonitorLogicModuleInstance {
         } While (($dataSources.id.Count -lt $response.data.total) -or ($dataSources.id.Count -lt $response.total))
 
         $message = ("{0}: Found {1} LogicModules applied to the device." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $dataSources.id.Count)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
         #endregion Get LogicModules
 
         #region Parse data
         $foundModule = 0
         Switch ($LogicModuleName, $DeviceLogicModuleId) {
             { If ($LogicModuleName.Count -ge 1) { If ($_ -is [String]) { $true } ElseIf ($_ -is [Array]) { $true } Else { $false } } ElseIf ($LogicModuleName.Count -eq 0) { $false } } {
-                $appliedLogicModule = $null
-                $name = $_ | Out-String
+                $name = ($_ | Out-String).Trim()
 
                 $message = ("{0}: Checking for applied modules with the name: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $name)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 If ($name -in $dataSources.dataSourceName) {
                     $foundModule++
-                    $appliedLogicModule = $dataSources | Where-Object { $_.dataSourceName -eq $name }
+                    $appliedLogicModules.Add($($dataSources | Where-Object { $_.dataSourceName -eq $name }))
 
-                    If ($appliedLogicModule.instanceNumber -gt 0) {
-                        $message = ("{0}: Found instances under {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                    If ($appliedLogicModules.instanceNumber -gt 0) {
+                        $message = ("{0}: Found instances under {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModules.dataSourceName)
+                        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
                     } Else {
-                        $message = ("{0}: No instances found for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                        $message = ("{0}: No instances found for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModules.dataSourceName)
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
                     }
                 }
             }
             { If ($DeviceLogicModuleId.Count -ge 1) { If ($_ -is [Int]) { $true } ElseIf ($_ -is [Array]) { $true } Else { $false } } ElseIf ($DeviceLogicModuleId.Count -eq 0) { $false } } {
-                $appliedLogicModule = $null
                 $id = $_ | Out-String
 
                 $message = ("{0}: Checking for applied modules with the ID: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $id)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 If ($id -in $dataSources.id) {
                     $foundModule++
-                    $appliedLogicModule = $dataSources | Where-Object { $_.id -eq $id }
+                    $appliedLogicModules = $dataSources | Where-Object { $_.id -eq $id }
 
-                    If ($appliedLogicModule.instanceNumber -gt 0) {
-                        $message = ("{0}: Found instances under {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.id)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                    If ($appliedLogicModules.instanceNumber -gt 0) {
+                        $message = ("{0}: Found instances under {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModules.id)
+                        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
                     } Else {
-                        $message = ("{0}: No instances found for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.id)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                        $message = ("{0}: No instances found for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModules.id)
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
                     }
                 }
             }
-            { ($appliedLogicModule.instanceNumber -gt 0) } {
-                $message = ("{0}: Found instances under {1}. Attempting to retrieve them." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        }
 
-                $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances"
+        If ($foundModule -gt 0) {
+            Foreach ($module in $appliedLogicModules) {
+                $message = ("{0}: Attempting to retrieve properties of the {1} instances." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $module.dataSourceName)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($module.Id)/instances"
 
                 If ($Filter) { $queryParams = "?filter=$Filter" } Else { $queryParams = $null }
 
                 $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-                # Get current time in milliseconds
+                #region Auth and headers
+                # Get current time in milliseconds.
                 $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-                # Concatenate Request Details
                 $requestVars = $httpVerb + $epoch + $resourcePath
-
-                # Construct Signature
                 $hmac = New-Object System.Security.Cryptography.HMACSHA256
                 $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                 $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                 $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                 $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-                # Construct Headers
                 $headers = @{
                     "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                     "Content-Type"  = "application/json"
                     "X-Version"     = 3
                 }
+                #endregion Auth and headers
 
                 Try {
                     $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
                 } Catch {
-                    $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModule.dataSourceName, $_.Exception.Message)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+                    $message = ("{0}: Unexpected error getting instances under {1}. Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedLogicModules.dataSourceName, $_.Exception.Message)
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                    Return 1
+                    Return "Error"
                 }
 
                 If ($response.items) {
                     $message = ("{0}: Found {1} matching instances. Attempting to enable." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.id.Count)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
                 } Else {
                     $message = ("{0}: No instances found." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message }
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                    Return 1
+                    Return "Error"
                 }
 
                 Foreach ($instance in $response.items) {
                     $response = $null
-                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($appliedLogicModule.Id)/instances/$($instance.id)"
+                    $resourcePath = "/device/devices/$($Device.id)/devicedatasources/$($module.Id)/instances/$($instance.id)"
                     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
-
-                    # Get current time in milliseconds
-                    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
 
                     If ($AlertingOnly) {
                         $body = @{
@@ -307,50 +336,48 @@ Function Enable-LogicMonitorLogicModuleInstance {
                         } | ConvertTo-Json
                     }
 
-                    # Concatenate Request Details
+                    #region Auth and headers
+                    # Get current time in milliseconds.
+                    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
                     $requestVars = "PATCH" + $epoch + $body + $resourcePath
-
-                    # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
                     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-                    # Construct Headers
                     $headers = @{
                         "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                         "Content-Type"  = "application/json"
                         "X-Version"     = 3
                     }
+                    #endregion Auth and headers
 
                     Try {
                         $response = Invoke-RestMethod -Uri $url -Method "PATCH" -Header $headers -Body $body -ErrorAction Stop
                     } Catch {
                         $message = ("{0}: Unexpected error enabling the instance, `"{1}`". Error: {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name, $_.Exception.Message)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message }
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
 
-                        $exitCode = 1
+                        $exitCode = "Error"
                     }
 
                     If ($response.id) {
-                        $message = ("{0}: On the instance `"{1}`", alerting is {2} and monitoring is {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name, $(If ($response.disableAlerting -eq 'False') { "disabled" } Else { "enabled" }), $(If ($response.stopMonitoring -eq 'False') { "disabled" } Else { "enabled" }))
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                        $message = ("{0}: On the instance `"{1}`", alerting is {2} and monitoring is {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name, $(If ($response.disableAlerting -eq 'False') { "enabled" } Else { "disabled" }), $(If ($response.stopMonitoring -eq 'False') { "enabled" } Else { "disabled" }))
+                        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
                     } Else {
                         $message = ("{0}: Failed to enable the instance, `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.name)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
                     }
                 }
             }
-        }
-
-        If ($foundModule -eq 0) {
+        } Else {
             $message = ("{0}: No instances found." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
         }
         #endregion Parse data
     }
     End {
         Return $exitCode
     }
-} #2022.10.25.0
+} #2023.06.12.0

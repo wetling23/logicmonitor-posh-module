@@ -13,6 +13,7 @@
             V1.0.0.6 date: 2 March 2021
             V2023.04.23.0
             V2023.04.28.0
+            V2023.06.12.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -25,6 +26,10 @@
             Represents Id of the desired dashboard.
         .PARAMETER Name
             Represents the name of the desired dashboard.
+        .PARAMETER Filter
+            Represents a string matching the API's filter format. This parameter can be used to filter for dashboards matching certain criteria (e.g. "Servers" appears in the groupName property).
+
+            See https://www.logicmonitor.com/support/rest-api-developers-guide/v1/devices/get-devices#Example-Request-5--GET-all-devices-that-have-a-spe
         .PARAMETER BatchSize
             Default value is 1000. Represents the number of dashboard to request from LogicMonitor, in a single batch.
         .PARAMETER BlockStdErr
@@ -36,48 +41,53 @@
         .EXAMPLE
             PS C:\> Get-LogicMonitorDashboard -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Verbose
 
-            In this example, the function will search for all dashboards and will return their properties. Verbose output is sent to the host.
+            In this example, the command will search for all dashboards and will return their properties. Verbose logging output will be sent only to the host.
         .EXAMPLE
             PS C:\> Get-LogicMonitorDashboard -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6
 
-            In this example, the function will search for the dashboard with "6" in the ID property and will return its properties.
+            In this example, the command will search for the dashboard with "6" in the ID property and will return its properties. Limited logging output will be sent only to the host.
         .EXAMPLE
             PS C:\> Get-LogicMonitorDashboard -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name dashboard1
 
-            In this example, the function will search for the dashboard with "dashboard1" in the name property and will return its properties.
+            In this example, the command will search for the dashboard with "dashboard1" in the name property and will return its properties. Limited logging output will be sent only to the host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorDashboard -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=groupName:"Servers"'
+
+            In this example, the command will search for the dashboard in the "Servers" group. Limited logging output will be sent only to the host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllDashboards')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'IdFilter')]
-        [int]$Id,
+        [Int]$Id,
 
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
-        [string]$Name,
+        [String]$Name,
 
-        [int]$BatchSize = 1000,
+        [Parameter(Mandatory, ParameterSetName = 'StringFilter')]
+        [String]$Filter,
 
-        [boolean]$BlockStdErr = $false,
+        [Int]$BatchSize = 1000,
 
-        [string]$EventLogSource,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$LogPath
+        [String]$EventLogSource,
+
+        [String]$LogPath
     )
 
     #region Setup
     #region Initialize variables
     $dashboards = [System.Collections.Generic.List[PSObject]]::New() # Primary collection to be filled with Invoke-RestMethod response.
     $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all dashboards.
-    $singleDashCheckDone = $false # Controls when a Do loop exits, if we are getting a single dashboard (by ID or name).
     $httpVerb = "GET" # Define what HTTP operation will the script run.
     $resourcePath = "/dashboard/dashboards" # Define the resourcePath, based on the type of dashboard you're searching for.
     $queryParams = $null
@@ -119,234 +129,155 @@
     #endregion Logging splatting
 
     $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    Out-PsLogging @loggingParams -MessageType First -Message $message
-    #endregion Setup
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
     $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
     If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
-    # Update $resourcePath to filter for a specific dashboard, when a dashboard ID is provided by the user.
-    If ($PsCmdlet.ParameterSetName -eq "IdFilter") {
-        $resourcePath += "/$Id"
+    #region Update filter/resourcePath
+    Switch ($PsCmdlet.ParameterSetName) {
+        "NameFilter" {
+            $filter = "filter=name:`"$Name`""
 
-        $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+            $Filter = [regex]::Replace(
+                $Filter,
+                '(?<=[:|><~]").*?(?=")',
+                {
+                    param($m)
+                    [Uri]::EscapeDataString($m.Value)
+                }
+            )
+        }
+        "StringFilter" {
+            $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+            $Filter = [regex]::Replace(
+                $Filter,
+                '(?<=[:|><~]").*?(?=")',
+                {
+                    param($m)
+                    [Uri]::EscapeDataString($m.Value)
+                }
+            )
+
+            $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        }
+        "IDFilter" {
+            # Update $resourcePath to filter for a specific device, when a device ID is provided by the user.
+            $resourcePath += "/$Id"
+
+            $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        }
     }
+    #endregion Update filter/resourcePath
 
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
+    $requestVars = $httpVerb + $epoch + $resourcePath
+    $hmac = New-Object System.Security.Cryptography.HMACSHA256
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
+    $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
+    $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
+    $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
+
+    $headers = @{
+        "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 3
+    }
+    #endregion Auth and headers
+
+    #region Execute REST query
     Do {
-        Switch ($PsCmdlet.ParameterSetName) {
-            "AllDashboards" {
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-            }
-            "IdFilter" {
-                $queryParams = "?filter=id:`"$Id`"&offset=$offset&size=$BatchSize&sort=id"
-
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-            }
-            "NameFilter" {
-                $queryParams = "?filter=name:`"$Name`"&offset=$offset&size=$BatchSize&sort=id"
-
-                $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-            }
+        If ($Filter) {
+            $queryParams = "?$Filter&offset=$offset&size=$BatchSize&sort=id"
+        } Else {
+            $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
         }
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-        If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+        $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+        $stopLoop = $false
+        Do {
+            Try {
+                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+
+                $stopLoop = $True
+            } Catch {
+                If ($_.Exception.Message -match '429') {
+                    $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                    Out-PsLogging @loggingParams -MessageType Warning -Message $message
+
+                    Start-Sleep -Seconds 60
+                } ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                    $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                    Return "Error"
+                } Else {
+                    $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                        Error message: {2}`r
+                        Error code: {3}`r
+                        Invoke-Request: {4}`r
+                        Headers: {5}`r
+                        Body: {6}" -f
+                        ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                    )
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                    Return "Error"
+                }
+            }
+        }
+        While ($stopLoop -eq $false)
+
+        If ($response.items.Count -gt 0) {
+            $message = ("{0}: Retrieved {1} dashboards of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
             If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-            # Get current time in milliseconds
-            $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-            # Concatenate Request Details
-            $requestVars = $httpVerb + $epoch + $resourcePath
-
-            # Construct Signature
-            $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
-            $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
-            $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
-            $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
-
-            # Construct Headers
-            $headers = @{
-                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
-                "Content-Type"  = "application/json"
-                "X-Version"     = 3
+            Foreach ($item in $response.items) {
+                $dashboards.Add($item)
             }
+
+            If (($response.items.Count -eq 1) -or ($response.total -and ($response.total -eq $dashboards.id.Count))) {
+                $message = ("{0}: Retrieved all dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                $stopLoop = $true
+            } Else {
+                # Increment offset, to grab the next batch of dashboards.
+                $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                $offset += $BatchSize
+                $stopLoop = $false
+            }
+        } ElseIf ($response.id) {
+            $dashboards = $response
+            $stopLoop = $true
+        } Else {
+            $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+            $stopLoop = $true
         }
 
-        Switch ($PsCmdlet.ParameterSetName) {
-            "AllDashboards" {
-                $message = ("{0}: Entering switch statement for all-dashboard retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        $message = ("{0}: There are {1} dashboards in `$dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $dashboards.id.Count)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    } Until ($stopLoop -eq $true)
+    #endregion Execute REST query
 
-                # Make Request
-                $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                $stopLoop = $false
-                Do {
-                    Try {
-                        $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
-
-                        $stopLoop = $True
-                        $firstLoopDone = $True
-                    }
-                    Catch {
-                        If ($_.Exception.Message -match '429') {
-                            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                            Out-PsLogging @loggingParams -MessageType Warning -Message $message
-
-                            Start-Sleep -Seconds 60
-                        }
-                        Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                                Error message: {2}`r
-                                Error code: {3}`r
-                                Invoke-Request: {4}`r
-                                Headers: {5}`r
-                                Body: {6}" -f
-                                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-                            )
-                            Out-PsLogging @loggingParams -MessageType Error -Message $message
-
-                            Return "Error"
-                        }
-                    }
-                }
-                While ($stopLoop -eq $false)
-
-                If ($firstLoopDone -and ($null -ne $response)) {
-                    # If no dashboard ID or name is provided...
-                    $dashboards.AddRange($response)
-
-                    $message = ("{0}: There are {1} dashboards in `$dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $dashboards.count)
-                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                    # Increment offset, to grab the next batch of dashboards.
-                    $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
-                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                    $offset += $BatchSize
-                }
-            }
-            # If a dashboard ID, or name is provided...
-            "IdFilter" {
-                $message = ("{0}: Entering switch statement for single-dashboard retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                # Make Request
-                $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                $stopLoop = $false
-                Do {
-                    Try {
-                        $response = [System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop)
-
-                        $stopLoop = $True
-                        $firstLoopDone = $True
-                        $singleDashCheckDone = $True
-                    }
-                    Catch {
-                        If ($_.Exception.Message -match '429') {
-                            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                            Out-PsLogging @loggingParams -MessageType Warning -Message $message
-
-                            Start-Sleep -Seconds 60
-                        }
-                        Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                                Error message: {2}`r
-                                Error code: {3}`r
-                                Invoke-Request: {4}`r
-                                Headers: {5}`r
-                                Body: {6}" -f
-                                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-                            )
-                            Out-PsLogging @loggingParams -MessageType Error -Message $message
-
-                            Return "Error"
-                        }
-                    }
-                }
-                While ($stopLoop -eq $false)
-
-                $dashboards.AddRange($response)
-
-                $message = ("{0}: There are {1} dashboards in `$dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($dashboards.count))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                Continue
-            }
-            "NameFilter" {
-                $message = ("{0}: Entering switch statement for single-dashboard retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                # Make Request
-                $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                $stopLoop = $false
-                Do {
-                    Try {
-                        $response = ([System.Collections.Generic.List[PSObject]]@(Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop).items)
-
-                        $stopLoop = $True
-                        $firstLoopDone = $True
-                        $singleDashCheckDone = $True
-                    }
-                    Catch {
-                        If ($_.Exception.Message -match '429') {
-                            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                            Out-PsLogging @loggingParams -MessageType Warning -Message $message
-
-                            Start-Sleep -Seconds 60
-                        }
-                        Else {
-                            $message = ("{0}: Unexpected error getting dashboards. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                                Error message: {2}`r
-                                Error code: {3}`r
-                                Invoke-Request: {4}`r
-                                Headers: {5}`r
-                                Body: {6}" -f
-                                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-                            )
-                            Out-PsLogging @loggingParams -MessageType Error -Message $message
-
-                            Return "Error"
-                        }
-                    }
-                }
-                While ($stopLoop -eq $false)
-
-                If ($response.id) {
-                    $dashboards.AddRange($response)
-                }
-                Else {
-                    $message = ("{0}: No dashboard located matching `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message -BlockStdErr $BlockStdErr }
-                }
-
-                $message = ("{0}: There are {1} dashboards in `$dashboards." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($dashboards.count))
-                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-                Continue
-            }
-        }
-    }
-    Until (($null -eq $response) -or ($singleDashCheckDone))
-
+    #region Output
     $dashboards
-} #2023.04.28.0
+    #endregion Output
+} #2023.06.12.0

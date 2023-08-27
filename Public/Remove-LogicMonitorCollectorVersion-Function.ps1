@@ -17,6 +17,8 @@ Function Remove-LogicMonitorCollectorVersion {
             V1.0.0.7 date: 10 December 2019
             V1.0.0.8 date: 23 July 2020
             V1.0.0.9 date: 21 September 2021
+            V2023.04.28.0
+            V2023.08.23.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -73,63 +75,62 @@ Function Remove-LogicMonitorCollectorVersion {
     )
 
     Begin {
-        # Initialize variables.
+        #region Initialize variables
         [hashtable]$downgradeProperties = @{ }
         [hashtable]$propertyData = @{ }
-        [string]$data = ""
         [string]$httpVerb = "PATCH"
-        [string]$queryParams = ""
+        [string]$queryParams = $null
         [string]$resourcePath = "/setting/collector/collectors"
-        [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
         [System.Net.SecurityProtocolType]$AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-        # Setup parameters for calling Get-LogicMonitor* cmdlet(s).
+        $commandParams = @{
+            AccountName = $AccountName
+            AccessId    = $AccessId
+            AccessKey   = $AccessKey
+        }
+        #endregion Initialize variables
+
+        #region Logging
+        # Setup parameters for splatting.
         If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
             If ($EventLogSource -and (-NOT $LogPath)) {
-                $commandParams = @{
+                $loggingParams = @{
                     Verbose        = $true
                     EventLogSource = $EventLogSource
                 }
-            }
-            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-                $commandParams = @{
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
                     Verbose = $true
                     LogPath = $LogPath
                 }
-            }
-            Else {
-                $commandParams = @{
+            } Else {
+                $loggingParams = @{
                     Verbose = $true
                 }
             }
-        }
-        Else {
+        } Else {
             If ($EventLogSource -and (-NOT $LogPath)) {
-                $commandParams = @{
-                    Verbose        = $false
+                $loggingParams = @{
                     EventLogSource = $EventLogSource
                 }
-            }
-            ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-                $commandParams = @{
-                    Verbose = $false
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
                     LogPath = $LogPath
                 }
-            }
-            Else {
-                $commandParams = @{
-                    Verbose = $false
-                }
+            } Else {
+                $loggingParams = @{}
             }
         }
+        #endregion Logging
     }
     Process {
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
+        #region Start date
         $message = ("{0}: Validating start time/date." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         If ($StartDate -eq $null) {
             # Neither start date is not provided.
@@ -137,6 +138,7 @@ Function Remove-LogicMonitorCollectorVersion {
         }
 
         $startEpoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End ($StartDate).ToUniversalTime()).TotalSeconds)
+        #endregion Start date
 
         # Update $resourcePath to filter for a specific collector, when a collector ID or Description is provided by the user.
         Switch ($PsCmdlet.ParameterSetName) {
@@ -145,19 +147,16 @@ Function Remove-LogicMonitorCollectorVersion {
             }
             "Name" {
                 $message = ("{0}: Attempting to retrieve the collector ID of {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Description)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                $collector = Get-LogicMonitorCollectors -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName -CollectorDescriptionName $Description @commandParams
+                $collector = Get-LogicMonitorCollectors @commandParams -CollectorDescriptionName $Description @loggingParams
 
                 $resourcePath += "/$($collector.id)"
 
                 $message = ("{0}: The value of `$resourcePath is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
             }
         }
-
-        $message = ("{0}: Finished updating `$resourcePath. The value is:`r`n {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
         # Sleeping because we get an error about scheduling, if we don't wait.
         Start-Sleep -Seconds 5
@@ -171,70 +170,59 @@ Function Remove-LogicMonitorCollectorVersion {
 
         # I am assigning $propertyData to $data, so that I can use the same $requestVars concatination and Invoke-RestMethod as other cmdlets in the module.
         $data = ($propertyData | ConvertTo-Json -Depth 5)
-        $enc = [System.Text.Encoding]::UTF8
-        $encdata = $enc.GetBytes($data)
 
-        $message = ("{0}: Finished updating `$data. The value update is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-        # Construct the query URL.
-        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
-
-        # Get current time in milliseconds
-        $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-        # Concatenate Request Details
+        #region Auth and headers
+        # Get current time in milliseconds.
+        $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
         $requestVars = $httpVerb + $epoch + $data + $resourcePath
-
-        # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
         $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-        # Construct Headers
         $headers = @{
-            "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+            "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
-            "X-Version"     = 2
+            "X-Version"     = 3
         }
+        #endregion Auth and headers
 
-        # Make Request
-        $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        # Construct the query URL.
+        $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
+        $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+        $stopLoop = $false
         Do {
             Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -data $encdata -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
 
                 $stopLoop = $True
-            }
-            Catch {
+            } Catch {
                 If ($_.Exception.Message -match '429') {
                     $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                    Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                     Start-Sleep -Seconds 60
-                }
-                Else {
+                } Else {
                     $message = ("{0}: Unexpected error scheduling a downgrade. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                        Error message: {2}`r
-                        Error code: {3}`r
-                        Invoke-Request: {4}`r
-                        Headers: {5}`r
-                        Body: {6}" -f
-                        ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
+                ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                     )
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
 
-                    Return "Error", $response
+                    Return "Error"
                 }
             }
-        }
-        While ($stopLoop -eq $false)
+        } While ($stopLoop -eq $false)
 
         Return $response
     }
-} #1.0.0.9
+} #2023.08.23.0

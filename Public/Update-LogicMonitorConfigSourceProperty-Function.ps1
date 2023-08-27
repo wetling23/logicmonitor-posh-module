@@ -6,6 +6,9 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 22 October 2021
                 - Initial release.
+            V2023.04.28.0
+            V2023.05.19.0
+            V2023.08.22.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -15,8 +18,10 @@
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Id
-            Represents the ID of a the ConfigSource.
-        .PARAMETER PropertyTable
+            Represents the ID of the desired ConfigSource.
+        .PARAMETER Name
+            Represents the name the desired ConfigSource. The cmdlet will look-up the ConfigSource ID.
+        .PARAMETER Properties
             Represents a hash table of property name/value pairs for the target object.
         .PARAMETER BlockStdErr
             When set to $True, the script will block "Write-Error". Use this parameter when calling from wscript. This is required due to a bug in wscript (https://groups.google.com/forum/#!topic/microsoft.public.scripting.wsh/kIvQsqxSkSk).
@@ -25,16 +30,9 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> $id = Get-LogicMonitorDashboardWidget -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Name "Server Dashboard"
-            PS C:\> $id = ($id | Where-Object {$_.name -eq 'SLA'}).id
-            PS C:\> Update-LogicMonitorDashboardWidgetProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id $id -PropertyTable @{name='Server SLA'} -LogPath C:\Temp\log.txt
+            PS C:\> Update-LogicMonitorConfigSourceProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -Properties @{ description = 'Gets data.'} -Verbose
 
-            This example shows Get-LogicMonitorDashboardWidget being used to query the "Server Dashboard" for widgets, then the returned value being filtered for the name "SLA" before returning the ID property.
-            The Update-LogicMonitorDashboardWidgetProperty command updates the selected widget, changing its name from "SLA" to "Server SLA". Limited logging will be written to C:\Temp\log.txt only.
-        .EXAMPLE
-            PS C:\> Update-LogicMonitorDashboardWidgetProperty -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> -Id 6 -PropertyTable @{calculationMethod=1; name='SLA'} -Verbose
-
-            In this example, the command will update the calculated method and name properties for the widget with "6" in the ID property. If the properties are not present, they will be added. Verbose logging output is sent only to the session host.
+            In this example, the command will update the description property for the ConfigSource with "6" in the ID property. If the description is not set, it will be added. Verbose logging output is sent only to the session host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Default')]
     Param (
@@ -42,116 +40,151 @@
         [string]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [secureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'Default')]
-        [int]$Id,
+        [Int]$Id,
 
-        ##add name
+        [Parameter(Mandatory, ParameterSetName = 'NameId')]
+        [String]$Name,
 
         [Parameter(Mandatory)]
-        [hashtable]$PropertyTable,
+        [Alias('PropertyTable')]
+        [Hashtable]$Properties,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Initialize variables.
-    [string]$httpVerb = 'PATCH' # Define what HTTP operation will the script run.
+    #region Setup
+    #region Initialize variables
+    <# Note that, as of 22 August 2023, I do not see /setting/configsources in the Swagger doc, with a PATCH method. The update works, but because it is not documented, I have not identified required/supported properties. #>
+    $httpVerb = 'PATCH' # Define what HTTP operation will the script run.
     $queryParams = $null
     $resourcePath = "/setting/configsources"
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    $commandParams = @{
+        AccountName = $AccountName
+        AccessId    = $AccessId
+        AccessKey   = $AccessKey
+    }
+
+    If ($PSCmdlet.ParameterSetName -eq 'NameId') {
+        $id = (Get-LogicMonitorConfigSource @commandParams -DisplayName $Name).id
+    }
     $resourcePath += "/$Id"
+    #endregion Initialize variables
 
-    $message = ("{0}: Finished updating `$resourcePath. The value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{
+                Verbose = $true
+            }
+        }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
+    }
+    #endregion Logging
 
-    $data = $PropertyTable | ConvertTo-Json -Depth 6
-    $enc = [System.Text.Encoding]::UTF8
-    $encdata = $enc.GetBytes($data)
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
-    $message = ("{0}: Finished updating `$data. The value update is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #region Execute REST query
+    $data = $($Properties | ConvertTo-Json -Depth 5)
 
-    # Construct the query URL.
-    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
-
-    # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-    # Concatenate Request Details
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
     $requestVars = $httpVerb + $epoch + $data + $resourcePath
-
-    # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
     $headers = @{
-        "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
+        "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
+    #endregion Auth and headers
 
-    $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    # Construct the query URL.
+    $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-    Try {
-        $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $encdata -ErrorAction Stop
-    }
-    Catch {
-        If ($_.Exception.Message -match '429') {
-            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+    $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-            Start-Sleep -Seconds 60
-        }
-        Else {
-            $message = ("{0}: Unexpected error updating LogicMonitor widget property. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-            Error message: {2}`r
-            Error code: {3}`r
-            Invoke-Request: {4}`r
-            Headers: {5}`r
-            Body: {6}" -f
+    $stopLoop = $false
+    Do {
+        Try {
+            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -Body $data -ErrorAction Stop
+
+            $stopLoop = $True
+        } Catch {
+            If ($_.Exception.Message -match '429') {
+                $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
+                Out-PsLogging @loggingParams -MessageType Warning -Message $message
+
+                Start-Sleep -Seconds 60
+            } Else {
+                $message = ("{0}: Unexpected error updating the ConfigSource. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                Error message: {2}`r
+                Error code: {3}`r
+                Invoke-Request: {4}`r
+                Headers: {5}`r
+                Body: {6}" -f
                 ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
                 ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
-            )
-            If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                )
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
-            Return "Error"
+                Return "Error"
+            }
         }
+    } While ($stopLoop -eq $false)
+
+    If ($response.id) {
+        $message = ("{0}: Successfully updated the ConfigSource ({1}) in LogicMonitor." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Id)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+        Return $response
+    } Else {
+        $message = ("{0}: Unexpected error updating the ConfigSource ({1}) in LogicMonitor. To prevent errors, {2} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Id, $MyInvocation.MyCommand)
+        Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+        Return "Error"
     }
-
-    Return $response
-} #1.0.0.0
-
-$PropertyTable = @{
-    configChecks = @(
-        [PSCustomObject]@{
-            id                 = 15587
-            description        = "The configuration file has changed."
-            configSourceId     = 29429432
-            alertLevel         = 2
-            ackClearAlert      = "True"
-            alertEffectiveIval = 30
-            alertTransitionInterval = 0
-            type = "ignore"
-            script = "@{format=arbitrary;diff_check=}"
-        }
-    )
-}
-
+    #endregion Execute REST query
+} #2023.08.22.0

@@ -8,6 +8,21 @@ This project is also published in the PowerShell Gallery at https://www.powershe
 - From GitHub: Save `/bin/<version>/LogicMonitor/<files>` to your module directory
 
 # Behavior changes
+## 2023.05.23.0
+- All cmdlets
+  - Updated to use API v3 (https://www.logicmonitor.com/support/v3-swagger-documentation)
+- New-LogicMonitorCollector
+  - Instead of requiring a collector description, the cmdlet now accepts an optional hashtable of properties.
+- Update-LogicMonitorAlertRuleProperty
+  - This cmdlet has been deprecated for some time. It is removed in this version. Use Update-LogicMonitorAlertRule instead.
+- Update-LogicMonitorCollectorProperty
+  - Now supports a hash table of propreties, instead of a separate list of properties and values.
+- New-LogicMonitorCollector
+  - No longer accepts the CollectorDisplayName parameter.
+  - Now accepts a hash table of properties and values.
+- Update-LogicMonitorDeviceProperty
+  - Now supports a hash table of propreties, instead of a separate list of properties and values.
+- Added new cmdlets, such as Remove-LogicMonitorUser
 ## 2023.02.27.0
 - Add-LogicMonitorCollector
   - Removed the "write to registry" section.

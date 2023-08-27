@@ -7,6 +7,8 @@
             Author: Mike Hashemi
             V1.0.0.0 date: 24 December 2020
                 - Initial release.
+            V2023.04.28.0
+            V2023.08.23.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -53,266 +55,217 @@
     [CmdletBinding(DefaultParameterSetName = 'AllEventSources')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = 'IDFilter')]
-        [int]$Id,
+        [Int]$Id,
 
         [Parameter(Mandatory, ParameterSetName = 'NameFilter')]
-        [string]$DisplayName,
+        [String]$DisplayName,
 
         [Parameter(Mandatory, ParameterSetName = 'AppliesToFilter')]
-        [string]$ApplyTo,
+        [String]$ApplyTo,
 
-        [int]$BatchSize = 1000,
+        [Int]$BatchSize = 1000,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    $message = ("{0}: Operating in the {1} parameter set." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $PsCmdlet.ParameterSetName)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Initialize variables.
-    [int]$currentBatchNum = 0 # Start at zero and increment in the while loop, so we know how many times we have looped.
+    #region Setup
+    #region Initialize variables
+    $eventSources = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the EventSources.
     [int]$offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
-    [int]$EventSourceBatchCount = 1 # Define how many times we need to loop, to get all EventSources.
-    [boolean] $firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all EventSources.
     [string]$httpVerb = "GET" # Define what HTTP operation will the script run.
     [string]$resourcePath = "/setting/eventsources" # Define the resourcePath.
     $queryParams = $null
-    $eventSources = $null
-    [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+    #endregion Initialize variables
 
-    $message = ("{0}: The resource path is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Update $resourcePath to filter for a specific EventSource, when a EventSource ID is provided by the user.
-    If ($PsCmdlet.ParameterSetName -eq "IDFilter") {
-        $resourcePath += "/$Id"
-
-        $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                Verbose        = $true
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                Verbose = $true
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{
+                Verbose = $true
+            }
+        }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
     }
+    #endregion Logging
 
-    # Determine how many times "GET" must be run, to return all EventSources, then loop through "GET" that many times.
-    While ($currentBatchNum -lt $EventSourceBatchCount) {
-        Switch ($PsCmdlet.ParameterSetName) {
-            "AllEventSources" {
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
-            "IDFilter" {
-                $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+    #region URL prep
+    Switch ($PsCmdlet.ParameterSetName) {
+        "NameFilter" {
+            $DisplayName = $DisplayName.Replace('_', '%5F')
+            $DisplayName = $DisplayName.Replace(' ', '%20')
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
-            "NameFilter" {
-                # Replace special characters to better encode the URL.
-                $DisplayName = $DisplayName.Replace('_', '%5F')
-                $DisplayName = $DisplayName.Replace(' ', '%20')
+            $filter = "name:`"$DisplayName`""
+        }
+        "AppliesToFilter" {
+            # Replace special characters to better encode the URL.
+            $ApplyTo = $ApplyTo.Replace('"', '%2522')
+            $ApplyTo = $ApplyTo.Replace('&', '%26')
+            $ApplyTo = $ApplyTo.Replace("`r`n", "`n")
+            $ApplyTo = $ApplyTo.Replace('#', '%23')
+            $ApplyTo = $ApplyTo.Replace("`n", '%0A')
+            $ApplyTo = $ApplyTo.Replace(')', '%29')
+            $ApplyTo = $ApplyTo.Replace('(', '%28')
+            $ApplyTo = $ApplyTo.Replace('>', '%3E')
+            $ApplyTo = $ApplyTo.Replace('<', '%3C')
+            $ApplyTo = $ApplyTo.Replace('/', '%2F')
+            $ApplyTo = $ApplyTo.Replace(',', '%2C')
+            $ApplyTo = $ApplyTo.Replace('*', '%2A')
+            $ApplyTo = $ApplyTo.Replace('!', '%21')
+            $ApplyTo = $ApplyTo.Replace('=', '%3D')
+            $ApplyTo = $ApplyTo.Replace('~', '%7E')
+            $ApplyTo = $ApplyTo.Replace(' ', '%20')
+            $ApplyTo = $ApplyTo.Replace('|', '%7C')
+            $ApplyTo = $ApplyTo.Replace('$', '%24')
+            $ApplyTo = $ApplyTo.Replace('\', '%5C')
+            $ApplyTo = $ApplyTo.Replace('_', '%5F')
 
-                $queryParams = "?filter=displayName:`"$DisplayName`"&offset=$offset&size=$BatchSize&sort=id"
+            $filter = "appliesTo:`"$ApplyTo`""
+        }
+        "IDFilter" {
+            $resourcePath += "/$Id"
+        }
+    }
+    #endregion URL prep
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
-            "AppliesToFilter" {
-                # Replace special characters to better encode the URL.
-                $ApplyTo = $ApplyTo.Replace('"', '%2522')
-                $ApplyTo = $ApplyTo.Replace('&', '%26')
-                $ApplyTo = $ApplyTo.Replace("`r`n", "`n")
-                $ApplyTo = $ApplyTo.Replace('#', '%23')
-                $ApplyTo = $ApplyTo.Replace("`n", '%0A')
-                $ApplyTo = $ApplyTo.Replace(')', '%29')
-                $ApplyTo = $ApplyTo.Replace('(', '%28')
-                $ApplyTo = $ApplyTo.Replace('>', '%3E')
-                $ApplyTo = $ApplyTo.Replace('<', '%3C')
-                $ApplyTo = $ApplyTo.Replace('/', '%2F')
-                $ApplyTo = $ApplyTo.Replace(',', '%2C')
-                $ApplyTo = $ApplyTo.Replace('*', '%2A')
-                $ApplyTo = $ApplyTo.Replace('!', '%21')
-                $ApplyTo = $ApplyTo.Replace('=', '%3D')
-                $ApplyTo = $ApplyTo.Replace('~', '%7E')
-                $ApplyTo = $ApplyTo.Replace(' ', '%20')
-                $ApplyTo = $ApplyTo.Replace('|', '%7C')
-                $ApplyTo = $ApplyTo.Replace('$', '%24')
-                $ApplyTo = $ApplyTo.Replace('\', '%5C')
-                $ApplyTo = $ApplyTo.Replace('_', '%5F')
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
+    $requestVars = $httpVerb + $epoch + $resourcePath
+    $hmac = New-Object System.Security.Cryptography.HMACSHA256
+    $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
+    $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
+    $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
+    $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-                $queryParams = "?filter=appliesTo:`"$ApplyTo`"&offset=$offset&size=$BatchSize&sort=id"
+    $headers = @{
+        "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
+        "Content-Type"  = "application/json"
+        "X-Version"     = 3
+    }
+    #endregion Auth and headers
 
-                $message = ("{0}: Updating `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-            }
+    Do {
+        If ([string]::IsNullOrEmpty($filter)) {
+            $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
+        } Else {
+            $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
         }
 
         # Construct the query URL.
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-        $message = ("{0}: The value of `$url is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-        If ($firstLoopDone -eq $false) {
-            $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-            # Get current time in milliseconds
-            $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-            # Concatenate Request Details
-            $requestVars = $httpVerb + $epoch + $resourcePath
-
-            # Construct Signature
-            $hmac = New-Object System.Security.Cryptography.HMACSHA256
-            $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
-            $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
-            $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
-            $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
-
-            # Construct Headers
-            $headers = @{
-                "Authorization" = "LMv1 $accessId`:$signature`:$epoch"
-                "Content-Type"  = "application/json"
-                "X-Version"     = 2
-            }
-        }
-
-        # Make Request
-        $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
+        $stopLoop = $false
         Do {
             Try {
-                $response = Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop
+                $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
 
                 $stopLoop = $True
-            }
-            Catch {
+            } Catch {
                 If ($_.Exception.Message -match '429') {
                     $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                    Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                     Start-Sleep -Seconds 60
-                }
-                Else {
-                    $message = ("{0}: Unexpected error getting EventSource(s). To prevent errors, {1} will exit. If present, the following details were returned:`r`n
-                        Error message: {2}`r
-                        Error code: {3}`r
-                        Invoke-Request: {4}`r
-                        Headers: {5}`r
-                        Body: {6}" -f
-                        ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                } ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                    $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                    Return "Error"
+                } Else {
+                    $message = ("{0}: Unexpected error getting EventSource. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    Error message: {2}`r
+                    Error code: {3}`r
+                    Invoke-Request: {4}`r
+                    Headers: {5}`r
+                    Body: {6}" -f
+                    ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                    ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                     )
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                     Return "Error"
                 }
             }
-        }
-        While ($stopLoop -eq $false)
+        } While ($stopLoop -eq $false)
 
-        Switch ($PsCmdlet.ParameterSetName) {
-            "AllEventSources" {
-                $message = ("{0}: Entering switch statement for all-EventSource retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($response.items.Count -gt 0) {
+            $message = ("{0}: Retrieved {1} EventSources of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                # If no EventSource ID is provided...
-                $eventSources += $response.items
+            Foreach ($item in $response.items) {
+                $eventSources.Add($item)
+            }
 
-                $message = ("{0}: There are {1} EventSources in `$eventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($eventSources.count))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If (($response.items.Count -eq 1) -or ($response.total -and ($response.total -eq $eventSources.id.Count))) {
+                $message = ("{0}: Retrieved all EventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                # The first time through the loop, figure out how many times we need to loop (to get all EventSources).
-                If ($firstLoopDone -eq $false) {
-                    [int]$EventSourceBatchCount = ((($response.total) / $BatchSize) + 1)
-
-                    $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all EventSources. LogicMonitor reports that there are {2} EventSources." `
-                            -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $EventSourceBatchCount, $response.total)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                }
-
-                # Increment offset, to grab the next batch of EventSources.
-                $message = ("{0}: Incrementing the search offset by {1}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                $stopLoop = $true
+            } Else {
+                # Increment offset, to grab the next batch of devices.
+                $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 $offset += $BatchSize
-
-                $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $EventSourceBatchCount)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                # Increment the variable, so we know when we have retrieved all EventSources.
-                $currentBatchNum++
+                $stopLoop = $false
             }
-            "IDFilter" {
-                $message = ("{0}: Entering switch statement for single-EventSource retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        } ElseIf ($response.id) {
+            $eventSources = $response
+            $stopLoop = $true
+        } Else {
+            $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
-                $eventSources = $response.items
-
-                $message = ("{0}: There are {1} EventSources in `$EventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($eventSources.count))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                Return $eventSources
-            }
-            { $_ -in ("NameFilter", "AppliesToFilter") } {
-                $message = ("{0}: Entering switch statement for filtered-EventSource retrieval." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                If ($response.items.count -eq 1) {
-                    $message = ("{0}: Found a single EventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    $eventSources = $response.items
-
-                    Return $eventSources
-                }
-                Else {
-                    $eventSources += $response.items
-
-                    $message = ("{0}: There are {1} EventSources in `$eventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($eventSources.count))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    # The first time through the loop, figure out how many times we need to loop (to get all EventSources).
-                    If ($firstLoopDone -eq $false) {
-                        [int]$EventSourceBatchCount = ((($response.total) / 250) + 1)
-
-                        $message = ("{0}: The function will query LogicMonitor {1} times to retrieve all EventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $eventSourceBatchCount)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                        $firstLoopDone = $True
-
-                        $message = ("{0}: Completed the first loop." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-                    }
-
-                    $message = ("{0}: Retrieving data in batch #{1} (of {2})." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $currentBatchNum, $EventSourceBatchCount)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                    # Increment the variable, so we know when we have retrieved all EventSources.
-                    $currentBatchNum++
-                }
-            }
+            $stopLoop = $true
         }
-    }
+
+        $message = ("{0}: There are {1} EventSources in `$eventSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $eventSources.id.Count)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    } Until (($response.total -eq $eventSources.id.Count) -or ($response.id.Count -eq $eventSources.id.Count))
 
     Return $eventSources
-} #1.0.0.0
+} #2023.08.23.0

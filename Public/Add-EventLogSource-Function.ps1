@@ -26,6 +26,7 @@ Function Add-EventLogSource {
                 - Updated whitespace.
                 - Updated output to only output status on 'verbose'.
             V1.0.0.9 date: 23 August 2019
+            V2023.05.25.0
         .PARAMETER EventLogSource
             Mandatory parameter. This parameter is used to specify the event source, that script/modules will use for logging.
     #>
@@ -48,19 +49,21 @@ Function Add-EventLogSource {
 
     If ($sourceExists -eq $False) {
         $message = ("{0}: The event source `"{1}`" does not exist. Prompting for elevation." -f [datetime]::Now, $EventLogSource)
-        Write-Host $message -ForegroundColor White
+        If ($PSBoundParameters['Verbose']) { Write-Verbose -Message $message }
 
         Try {
             Start-Process PowerShell -Verb RunAs -ArgumentList "New-EventLog -LogName Application -Source $EventLogSource -ErrorAction Stop"
         }
         Catch [System.InvalidOperationException] {
             $message = ("{0}: It appears that the user cancelled the operation." -f [datetime]::Now)
-            Write-Host $message -ForegroundColor Yellow
+            Write-Warning -message $message
+
             Return "Error"
         }
         Catch {
             $message = ("{0}: Unexpected error launching an elevated Powershell session. The specific error is: {1}" -f [datetime]::Now, $_.Exception.Message)
-            Write-Host $message -ForegroundColor Red
+            Write-Error -Message $message
+
             Return "Error"
         }
 
@@ -68,8 +71,8 @@ Function Add-EventLogSource {
     }
     Else {
         $message = ("{0}: The event source `"{1}`" already exists. There is no action for {2} to take." -f [datetime]::Now, $EventLogSource, $MyInvocation.MyCommand)
-        Write-Verbose $message
+        If ($PSBoundParameters['Verbose']) { Write-Verbose $message }
 
         Return "Success"
     }
-} #1.0.0.9
+} #2023.05.25.0

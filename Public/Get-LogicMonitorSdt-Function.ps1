@@ -22,6 +22,8 @@
             V1.0.0.9 date: 23 July 2020
             V1.0.0.10 date: 2 October 2020
             V2022.02.21.0
+            V2023.04.28.0
+            V2023.08.23.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -69,83 +71,114 @@
     [CmdletBinding(DefaultParameterSetName = 'AllSdt')]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessID,
+        [String]$AccessID,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = "StringFilter")]
-        [hashtable]$Filter,
+        [Hashtable]$Filter,
 
         [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
         [Alias("SdtId")]
-        [string]$Id,
+        [String]$Id,
 
         [Parameter(Mandatory, ParameterSetName = "AdminName")]
-        [string]$AdminName,
+        [String]$AdminName,
 
         [Parameter(ParameterSetName = "AdminName")]
         [Parameter(ParameterSetName = "Id")]
         [Parameter(ParameterSetName = "AllSdt")]
         [ValidateSet('ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT')]
-        [string]$SdtType,
+        [String]$SdtType,
 
-        [switch]$IsEffective,
+        [Switch]$IsEffective,
 
-        [int]$BatchSize = 1000,
+        [Int]$BatchSize = 1000,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
     Begin {
-        # Initialize variables.
-        [boolean]$firstLoopDone = $false # Will change to true, once the function determines how many times it needs to loop, to retrieve all alerts.
+        #region Initialize variables
         $hashstr = $null # Filter as a string.
-        $sdts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the alerts.
-        $response = $null
-        $offset = 0 # Define how many agents from zero, to start the query. Initial is zero, then it gets incremented later.
+        $sdts = [System.Collections.Generic.List[PSObject]]::new() # Create a collection to hold the SDTs.
         $httpVerb = "GET" # Define what HTTP operation will the script run.
         $resourcePath = "/sdt/sdts" # Define the resourcePath, based on what you're searching for.
         $queryParams = $null
-        [boolean]$stopLoop = $false # Ensures we run Invoke-RestMethod at least once.
+        $offset = 0
         $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
         [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
+        #endregion Initialize variables
     }
     Process {
+        #region Logging
+        # Setup parameters for splatting.
+        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    Verbose        = $true
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    Verbose = $true
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{
+                    Verbose = $true
+                }
+            }
+        } Else {
+            If ($EventLogSource -and (-NOT $LogPath)) {
+                $loggingParams = @{
+                    EventLogSource = $EventLogSource
+                }
+            } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+                $loggingParams = @{
+                    LogPath = $LogPath
+                }
+            } Else {
+                $loggingParams = @{}
+            }
+        }
+        #endregion Logging
+
         $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         Switch ($PsCmdlet.ParameterSetName) {
             { $_ -eq "Id" } {
                 $resourcePath += "/$Id"
 
                 $message = ("{0}: Updated resource path to {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
             }
             { $_ -eq "StringFilter" } {
                 $message = ("{0}: Checking filter for invalid keys." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 Foreach ($key in $($Filter.keys)) {
                     If ($key -notin 'id', 'admin', 'comment', 'monthDay', 'hour', 'minute', 'endHour', 'endMinute', 'duration', 'startDateTimeOnLocal', 'startDateTime', 'endDateTimeOnLocal', `
                             'endDateTime', 'isEffective', 'timezone', 'type', 'weekOfMonth', 'sdtType', 'weekDay', 'deviceId', 'deviceDisplayName') {
 
                         $message = ("{0}: Unable to filter by {1}, removing the entry." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $key)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                         $filter.remove($key)
                     }
                 }
 
                 $message = ("{0}: Converting special characters to URL encoding." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 Foreach ($clone in ($Filter.Clone()).Keys) {
                     $filter.$clone = ($filter.$clone).Replace('"', '%2522')
@@ -171,135 +204,176 @@
                 }
 
                 $message = ("{0}: Converting the filter hashtable to a string." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 foreach ($key in $($filter.keys)) {
                     $hashstr += $key + ":" + "`"$($filter[$key])`"" + ","
                 }
-                $filter = ($hashstr.trimend(',')).Replace("`"", "%22")
+                $filter = ($hashstr.TrimEnd(',')).Replace("`"", "%22")
             }
         }
 
         # Build the filter, if any of the following conditions are met.
         Switch ($IsEffective, $SdtType) {
             { $_.IsPresent } {
-                $filter += "isEffective:`"True`","
+                If ($Filter -is [hashtable]) {
+                    Try {
+                        $Filter.Add('isEffective', "True")
+                    } Catch {
+                        # Key, "isEffective" is likely already present, do nothing.
+                    }
+                } Else {
+                    $filter += "isEffective:`"True`","
+                }
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $filter)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 Continue
             }
             { $_ -in 'ServiceSDT', 'CollectorSDT', 'DeviceDataSourceInstanceSDT', 'DeviceBatchJobSDT', 'DeviceClusterAlertDefSDT', 'DeviceDataSourceInstanceGroupSDT', 'DeviceDataSourceSDT', 'DeviceEventSourceSDT', 'DeviceGroupSDT', 'DeviceSDT', 'WebsiteCheckpointSDT', 'WebsiteGroupSDT', 'WebsiteSDT' } {
-                $filter += "type:`"$sdtType`","
+                If ($Filter -is [hashtable]) {
+                    Try {
+                        $Filter.Add('type', "$sdtType")
+                    } Catch {
+                        # Key, "type" is likely already present, do nothing.
+                    }
+                } Else {
+                    $filter += "type:`"$sdtType`","
+                }
 
-                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $filter)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 Continue
             }
         }
 
         If ($PsCmdlet.ParameterSetName -eq "AdminName") {
-            $filter += "admin:`"$AdminName`","
-
-            $message = ("{0}: Updating `$filter variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($Filter -is [hashtable]) {
+                Try {
+                    $Filter.Add('admin', "$AdminName")
+                } Catch {
+                    # Key, "admin" is likely already present, do nothing.
+                }
+            } Else {
+                [String]$filter += "admin:`"$AdminName`","
+            }
         }
 
         If (-NOT([string]::IsNullOrEmpty($filter))) {
-            $filter = $filter.TrimEnd(",")
+            If ($Filter -is [hashtable]) {
+                foreach ($key in $($filter.keys)) {
+                    $hashstr += $key + ":" + "`"$($filter[$key])`"" + ","
+                }
+                $filter = ($hashstr.TrimEnd(',')).Replace("`"", "%22")
+            } Else {
+                $filter = $filter.TrimEnd(",")
+            }
         }
 
-        # Determine how many times "GET" must be run, to return all SDT entries, then loop through "GET" that many times.
-        While (($response.Count -ge 1) -or ($firstLoopDone -eq $false)) {
-            $message = ("{0}: The request loop has run {1} times." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $batchCount)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        $message = ("{0}: The final `$filter value is {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filter)
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
+        #region Auth and headers
+        # Get current time in milliseconds.
+        $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
+        $requestVars = $httpVerb + $epoch + $resourcePath
+        $hmac = New-Object System.Security.Cryptography.HMACSHA256
+        $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
+        $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
+        $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
+        $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
+
+        $headers = @{
+            "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
+            "Content-Type"  = "application/json"
+            "X-Version"     = 3
+        }
+        #endregion Auth and headers
+
+        Do {
             If ([string]::IsNullOrEmpty($filter)) {
                 $queryParams = "?offset=$offset&size=$BatchSize&sort=id"
-            }
-            Else {
+            } Else {
                 $queryParams = "?filter=$filter&offset=$offset&size=$BatchSize&sort=id"
             }
-
-            $message = ("{0}: Updated `$queryParams variable in {1}. The value is {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $($PsCmdlet.ParameterSetName), $queryParams)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
 
             # Construct the query URL.
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-            # Build header.
-            If ($firstLoopDone -eq $false) {
-                $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-                # Get current time in milliseconds
-                $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-                # Concatenate Request Details
-                $requestVars = $httpVerb + $epoch + $resourcePath
-
-                # Construct Signature
-                $hmac = New-Object System.Security.Cryptography.HMACSHA256
-                $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
-                $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
-                $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
-                $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
-
-                # Construct Headers
-                $headers = @{
-                    "Authorization" = "LMv1 $AccessID`:$signature`:$epoch"
-                    "Content-Type"  = "application/json"
-                    "X-Version"     = 2
-                }
-            }
-
-            # Make the API request.
-            $message = ("{0}: Executing the REST query." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $stopLoop = $false
             Do {
                 Try {
-                    $response = [System.Collections.Generic.List[PSObject]]@((Invoke-RestMethod -Uri $url -Method $httpverb -Header $headers -ErrorAction Stop).items)
+                    $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
 
                     $stopLoop = $True
-                }
-                Catch {
+                } Catch {
                     If ($_.Exception.Message -match '429') {
                         $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                         Start-Sleep -Seconds 60
-                    }
-                    Else {
-                        $message = ("{0}: Unexpected error getting alerts. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
+                    } ElseIf ($_.ErrorDetails -match 'invalid filter') {
+                        $message = ("{0}: LogicMonitor returned `"invalid filter`". Please validate the value of the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
+
+                        Return "Error"
+                    } Else {
+                        $message = ("{0}: Unexpected error getting SDTs. To prevent errors, {1} will exit. If present, the following details were returned:`r`n
                         Error message: {2}`r
                         Error code: {3}`r
                         Invoke-Request: {4}`r
                         Headers: {5}`r
                         Body: {6}" -f
-                            ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
-                            ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                        ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                        ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                         )
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                         Return "Error"
                     }
                 }
+            } While ($stopLoop -eq $false)
+
+            If ($response.items.Count -gt 0) {
+                $message = ("{0}: Retrieved {1} SDTs of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                Foreach ($item in $response.items) {
+                    $sdts.Add($item)
+                }
+
+                If (($response.items.Count -eq 1) -or ($response.total -and ($response.total -eq $sdts.id.Count))) {
+                    $message = ("{0}: Retrieved all SDTs." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                    $stopLoop = $true
+                } Else {
+                    # Increment offset, to grab the next batch of devices.
+                    $message = ("{0}: Incrementing the search offset by {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $BatchSize)
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                    $offset += $BatchSize
+                    $stopLoop = $false
+                }
+            } ElseIf ($response.id) {
+                $sdts = $response
+                $stopLoop = $true
+            } Else {
+                $message = ("{0}: The `$response variable is empty." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+
+                $stopLoop = $true
             }
-            While ($stopLoop -eq $false)
 
-            $sdts.AddRange($response)
-
-            $message = ("{0}: Executed REST query. There are {1} entries in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $sdts.id.Count)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-            $offset += $BatchSize
-            $firstLoopDone = $true
-        }
+            $message = ("{0}: There are {1} SDTs in `$sdts." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $sdts.id.Count)
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        } Until ($stopLoop -eq $true)
 
         Return $sdts
     }
-} #V2022.02.21.0
+} #2023.08.23.0

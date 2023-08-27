@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.04.28.0'
+ModuleVersion = '2023.08.27.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -69,43 +69,49 @@ PowerShellVersion = '5.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Add-EventLogSource', 'Confirm-OutputPathAvailability',
-               'Disable-LogicMonitorLogicModuleInstance',
-               'Enable-LogicMonitorLogicModuleInstance', 'Get-LogicMonitorAlert',
-               'Get-LogicMonitorAuditLog', 'Get-LogicMonitorAlertRule',
-               'Get-LogicMonitorCollector',
-               'Get-LogicMonitorCollectorAvailableVersion',
-               'Get-LogicMonitorCollectorInstaller',
-               'Get-LogicMonitorCollectorUpgradeHistory',
-               'Get-LogicMonitorConfigSource', 'Get-LogicMonitorConfigSourceData',
-               'Get-LogicMonitorDashboard', 'Get-LogicMonitorDashboardGroup',
-               'Get-LogicMonitorDashboardWidget', 'Get-LogicMonitorDataSource',
-               'Get-LogicMonitorDataSourceDevice', 'Get-LogicMonitorDevice',
-               'Get-LogicMonitorDeviceDataSource', 'Get-LogicMonitorDeviceGroup',
-               'Get-LogicMonitorDeviceGroupProperty',
-               'Get-LogicMonitorDeviceProperty', 'Get-LogicMonitorDeviceSdt',
-               'Get-LogicMonitorEscalationChain', 'Get-LogicMonitorEventSource',
-               'Get-LogicMonitorIntegration', 'Get-LogicMonitorJobMonitor',
-               'Get-LogicMonitorPropertySource', 'Get-LogicMonitorReport',
-               'Get-LogicMonitorReportGroup', 'Get-LogicMonitorRawData',
-               'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorUser',
-               'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup',
-               'Get-LogicMonitorWebsiteProperty', 'New-LogicMonitorAlertRule',
-               'New-LogicMonitorCollector', 'New-LogicMonitorDashboard',
-               'New-LogicMonitorDashboardGroup', 'New-LogicMonitorDashboardWidget',
-               'New-LogicMonitorDevice', 'New-LogicMonitorDeviceGroup',
-               'New-LogicMonitorReportGroup', 'New-LogicMonitorWebsite',
-               'New-LogicMonitorWebsiteGroup', 'Out-PsLogging',
-               'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector',
-               'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDevice',
-               'Remove-LogicMonitorDeviceProperty',
-               'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorSdt',
-               'Send-LogicMonitorLmLogEntry', 'Start-LogicMonitorDeviceSdt',
-               'Update-LogicMonitorAlertRule', 'Update-LogicMonitorAlertRuleProperty',
-               'Update-LogicMonitorCollectorProperty',
-               'Update-LogicMonitorCollectorVersion',
-               'Update-LogicMonitorDashboardWidgetProperty',
-               'Update-LogicMonitorDeviceProperty', 'Update-LogicMonitorWebsiteProperty'
+FunctionsToExport = 'Add-EventLogSource',
+                'Disable-LogicMonitorLogicModuleInstance',
+                'Enable-LogicMonitorLogicModuleInstance',
+                'Get-LogicMonitorAlert', 'Get-LogicMonitorAlertRule',
+                'Get-LogicMonitorAuditLog', 'Get-LogicMonitorCollector',
+                'Get-LogicMonitorCollectorAvailableVersion',
+                'Get-LogicMonitorCollectorInstaller',
+                'Get-LogicMonitorCollectorUpgradeHistory',
+                'Get-LogicMonitorConfigSource', 'Get-LogicMonitorConfigSourceData',
+                'Get-LogicMonitorDashboard', 'Get-LogicMonitorDashboardGroup',
+                'Get-LogicMonitorDashboardWidget', 'Get-LogicMonitorDataSource',
+                'Get-LogicMonitorDataSourceDevice', 'Get-LogicMonitorDevice',
+                'Get-LogicMonitorDeviceDataSource', 'Get-LogicMonitorDeviceGroup',
+                'Get-LogicMonitorDeviceGroupProperty',
+                'Get-LogicMonitorDeviceProperty', 'Get-LogicMonitorDeviceSdt',
+                'Get-LogicMonitorEscalationChain', 'Get-LogicMonitorEventSource',
+                'Get-LogicMonitorIntegration', 'Get-LogicMonitorJobMonitor',
+                'Get-LogicMonitorPropertySource', 'Get-LogicMonitorRawData',
+                'Get-LogicMonitorReport','Get-LogicMonitorReportGroup',
+                'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorTopology',
+                'Get-LogicMonitorUser', 'Get-LogicMonitorUserRole',
+                'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup',
+                'Get-LogicMonitorWebsiteProperty',
+                'New-LogicMonitorAlertRule', 'New-LogicMonitorCollector',
+                'New-LogicMonitorDashboard', 'New-LogicMonitorDashboardGroup',
+                'New-LogicMonitorDashboardWidget', 'New-LogicMonitorDevice',
+                'New-LogicMonitorDeviceGroup', 'New-LogicMonitorReportGroup',
+                'New-LogicMonitorUser', 'New-LogicMonitorWebsite',
+                'New-LogicMonitorWebsiteGroup',
+                'Out-PsLogging',
+                'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector',
+                'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDashboardGroup',
+                'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceGroup',
+                'Remove-LogicMonitorDeviceGroupProperty', 'Remove-LogicMonitorDeviceProperty',
+                'Remove-LogicMonitorSdt', 'Remove-LogicMonitorUser',
+                'Remove-LogicMonitorWebsiteGroup',
+                'Send-LogicMonitorLmLogEntry',
+                'Start-LogicMonitorDeviceSdt',
+                'Update-LogicMonitorAlertRule', 'Update-LogicMonitorCollectorProperty',
+                'Update-LogicMonitorCollectorVersion', 'Update-LogicMonitorConfigSourceProperty',
+                'Update-LogicMonitorDashboardWidgetProperty',
+                'Update-LogicMonitorDeviceGroupProperty', 'Update-LogicMonitorDeviceProperty',
+                'Update-LogicMonitorWebsiteGroupProperty', 'Update-LogicMonitorWebsiteProperty'
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = '*'
@@ -143,7 +149,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitorEscalationChain to 2023.04.28.0 (using API v3 now, and added support for a string filter). Updated Get-LogicMonitorDashboard to 2023.04.28.0 (using API v3 now).'
+            ReleaseNotes = 'Updated all cmdlets to use API v3. I also included some bug fixes and added Remove-LogicMonitorDashboardGroup. See README and individual Github commits, for individual-cmdlet update details.'
 
         # Prerelease string of this module
         # Prerelease = ''

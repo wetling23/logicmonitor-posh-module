@@ -11,6 +11,8 @@ Function Get-LogicMonitorConfigSourceData {
             V1.0.0.2 date: 1 April 2021
             V1.0.0.3 date: 20 April 2021
             V1.0.0.4 date: 19 August 2021
+            V2023.04.28.0
+            V2023.06.12.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -100,63 +102,77 @@ Function Get-LogicMonitorConfigSourceData {
         [string]$LogPath
     )
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
     #region Setup
-    # Initialize variables.
+    #region Initialize variables
     [string]$httpVerb = "GET" # Define what HTTP operation will the script run.
     $queryParams = '?filter=dataSourceType:"CS"'
     $i = 0 # Used later, to count the times we go through a foreach loop.
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
-    # Splatting for Get-LogicMonitor* cmdlet(s).
-    If ($PSBoundParameters['Verbose']) {
-        $commandParams = @{
-            Verbose = $true
-        }
+    $commandParams = @{
+        AccessId    = $AccessId
+        AccessKey   = $AccessKey
+        AccountName = $AccountName
+    }
+    #endregion Initialize variables
 
+    #region Logging
+    # Setup parameters for splatting.
+    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') {
         If ($EventLogSource -and (-NOT $LogPath)) {
-            $CommandParams.Add('EventLogSource', $EventLogSource)
-        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $CommandParams.Add('LogPath', $LogPath)
-        }
-    } Else {
-        If ($EventLogSource -and (-NOT $LogPath)) {
-            $commandParams = @{
+            $loggingParams = @{
+                Verbose        = $true
                 EventLogSource = $EventLogSource
             }
         } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
-            $commandParams = @{
+            $loggingParams = @{
+                Verbose = $true
                 LogPath = $LogPath
             }
         } Else {
-            $commandParams = @{
-                Verbose = $false
+            $loggingParams = @{
+                Verbose = $true
             }
         }
+    } Else {
+        If ($EventLogSource -and (-NOT $LogPath)) {
+            $loggingParams = @{
+                EventLogSource = $EventLogSource
+            }
+        } ElseIf ($LogPath -and (-NOT $EventLogSource)) {
+            $loggingParams = @{
+                LogPath = $LogPath
+            }
+        } Else {
+            $loggingParams = @{}
+        }
     }
+    #endregion Logging
+
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    #endregion Setup
 
     $message = ("{0}: Parsing device identity." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
     If ($DeviceDisplayName) {
-        $deviceId = (Get-LogicMonitorDevice -DisplayName $DeviceDisplayName -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName @commandParams).id
+        $deviceId = (Get-LogicMonitorDevice -DisplayName $DeviceDisplayName @commandParams @loggingParams).id
     }
     ElseIf ($DeviceIp) {
-        $deviceId = (Get-LogicMonitorDevice -Name $DeviceIp -AccessId $AccessId -AccessKey $AccessKey -AccountName $AccountName @commandParams).id
+        $deviceId = (Get-LogicMonitorDevice -Name $DeviceIp @commandParams @loggingParams).id
     }
 
     If (($DeviceId) -and ($DeviceId -as [int])) {
         $resourcePath = "/device/devices/$DeviceId/devicedatasources"
 
         $message = ("{0}: Set resource path = {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $resourcePath)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
     }
     Else {
         $message = ("{0}: No device ID identified. To prevent errors, {1} will exit. Please provide a valid LogicMonitor device ID, device display name, or device name/IP and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+        Out-PsLogging @loggingParams -MessageType Error -Message $message
 
         Return "Error"
     }
@@ -166,31 +182,25 @@ Function Get-LogicMonitorConfigSourceData {
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath$queryParams"
 
-    $message = ("{0}: Building request header." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
-
-    # Get current time in milliseconds
-    $epoch = [Math]::Round((New-TimeSpan -start (Get-Date -Date "1/1/1970") -end (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-    # Concatenate Request Details
+    #region Auth and headers
+    # Get current time in milliseconds.
+    $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
     $requestVars = $httpVerb + $epoch + $resourcePath
-
-    # Construct Signature
     $hmac = New-Object System.Security.Cryptography.HMACSHA256
     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-    # Construct Headers
     $headers = @{
         "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
         "Content-Type"  = "application/json"
-        "X-Version"     = 2
+        "X-Version"     = 3
     }
+    #endregion Auth and headers
 
     $message = ("{0}: Executing REST query to get all applied ConfigSources." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
     $stopLoop = $false
     Do {
@@ -201,7 +211,7 @@ Function Get-LogicMonitorConfigSourceData {
         } Catch {
             If ($_.Exception.Message -match '429') {
                 $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                 Start-Sleep -Seconds 60
             } Else {
@@ -214,7 +224,7 @@ Function Get-LogicMonitorConfigSourceData {
                     ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue),
                     ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                 )
-                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
             }
@@ -226,44 +236,41 @@ Function Get-LogicMonitorConfigSourceData {
     #region Get all instances
     If (($appliedConfigSources.items.id) -and (($appliedConfigSources.items | Where-Object { $_.dataSourceName -eq $ConfigSourceName }) -or ($appliedConfigSources.items | Where-Object { $_.id -eq $ConfigSourceId }))) {
         $message = ("{0}: Found the desired ConfigSource." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         If (-NOT($ConfigSourceId)) {
             $message = ("{0}: ConfigSource ID not provided, attempting to identify it." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $ConfigSourceId = ($appliedConfigSources.items | Where-Object { $_.dataSourceName -eq $ConfigSourceName }).id
         }
 
         $message = ("{0}: Attempting to get all instances of ConfigSource with ID {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $ConfigSourceId)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         $resourcePath += "/$ConfigSourceId/instances"
 
         $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-        # Get current time in milliseconds
+        #region Auth and headers
+        # Get current time in milliseconds.
         $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-        # Concatenate Request Details
         $requestVars = $httpVerb + $epoch + $resourcePath
-
-        # Construct Signature
         $hmac = New-Object System.Security.Cryptography.HMACSHA256
         $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
         $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
         $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
         $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-        # Construct Headers
         $headers = @{
             "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
             "Content-Type"  = "application/json"
-            "X-Version"     = 2
+            "X-Version"     = 3
         }
+        #endregion Auth and headers
 
         $message = ("{0}: Executing REST query to get all instances of CS {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $ConfigSourceId)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         $stopLoop = $false
         Do {
@@ -273,7 +280,7 @@ Function Get-LogicMonitorConfigSourceData {
             } Catch {
                 If ($_.Exception.Message -match '429') {
                     $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                    Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                     Start-Sleep -Seconds 60
                 } Else {
@@ -286,7 +293,7 @@ Function Get-LogicMonitorConfigSourceData {
                         ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue),
                         ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                     )
-                    If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                    Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                     Return "Error"
                 }
@@ -298,7 +305,7 @@ Function Get-LogicMonitorConfigSourceData {
         #region Get data
         If (($instances.items) -and ($InstanceName)) {
             $message = ("{0}: Parsing instance ID for {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $InstanceName)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $desiredInstances = ($instances.items | Where-Object { ($_.Displayname -match $InstanceName) -or ($_.name -match $InstanceName) })
         }
@@ -310,34 +317,31 @@ Function Get-LogicMonitorConfigSourceData {
             $i++
 
             $message = ("{0}: Getting the most recent config backup for instance {1}. This is instance {2} of {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.id, $i, $desiredInstances.id.Count)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $resourcePath = "/device/devices/$DeviceId/devicedatasources/$ConfigSourceId/instances/$($instance.id)/config"
 
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-            # Get current time in milliseconds
+            #region Auth and headers
+            # Get current time in milliseconds.
             $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-            # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
-
-            # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
             $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-            # Construct Headers
             $headers = @{
                 "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
-                "X-Version"     = 2
+                "X-Version"     = 3
             }
+            #endregion Auth and headers
 
             $message = ("{0}: Executing REST query to get config backup." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $stopLoop = $false
             Do {
@@ -347,7 +351,7 @@ Function Get-LogicMonitorConfigSourceData {
                 } Catch {
                     If ($_.Exception.Message -match '429') {
                         $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                         Start-Sleep -Seconds 60
                     } Else {
@@ -360,7 +364,7 @@ Function Get-LogicMonitorConfigSourceData {
                             ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue),
                             ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                         )
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                         Return "Error"
                     }
@@ -370,7 +374,7 @@ Function Get-LogicMonitorConfigSourceData {
 
             If ($data.items) {
                 $message = ("{0}: Retrieved {1} backups. Returning {2} backups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data.items.id.Count, $EntryCount)
-                If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 If ($EntryCount -eq "All") {
                     $data.items | Sort-Object -Property pollTimestamp # Sorted this way, the newest backup is first in the list.
@@ -386,49 +390,46 @@ Function Get-LogicMonitorConfigSourceData {
     }
     ElseIf (($appliedConfigSources.items.id) -and ($ConfigSourceName)) {
         $message = ("{0}: No applied ConfigSources found under the name `"{1}`"." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $ConfigSourceName)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         Return "No data"
     }
     ElseIf ($appliedConfigSources.items.id) {
         $message = ("{0}: Identified {1} applied ConfigSources. No ConfigSource filter provided, getting all instances." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $appliedConfigSources.items.id.Count)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         If ($InstanceName) {
             $message = ("{0}: A value for -InstanceName ({1}) was provided, but nothing for -ConfigSourceName/ConfigSourceNameId. The instance-name filter will be ignored." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $InstanceName)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
         }
 
         Foreach ($cs in $appliedConfigSources.items) {
             $message = ("{0}: Attempting to get all instances of ConfigSource with ID {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $cs.id)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $resourcePath = "/device/devices/$DeviceId/devicedatasources/$($cs.id)/instances"
 
             $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-            # Get current time in milliseconds
+            #region Auth and headers
+            # Get current time in milliseconds.
             $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-            # Concatenate Request Details
             $requestVars = $httpVerb + $epoch + $resourcePath
-
-            # Construct Signature
             $hmac = New-Object System.Security.Cryptography.HMACSHA256
             $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
             $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
             $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
             $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-            # Construct Headers
             $headers = @{
                 "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                 "Content-Type"  = "application/json"
-                "X-Version"     = 2
+                "X-Version"     = 3
             }
+            #endregion Auth and headers
 
             $message = ("{0}: Executing REST query to get all instances of CS {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $cs.id)
-            If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+            If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             $stopLoop = $false
             Do {
@@ -438,7 +439,7 @@ Function Get-LogicMonitorConfigSourceData {
                 } Catch {
                     If ($_.Exception.Message -match '429') {
                         $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                        Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                         Start-Sleep -Seconds 60
                     } Else {
@@ -451,7 +452,7 @@ Function Get-LogicMonitorConfigSourceData {
                             ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue),
                             ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                         )
-                        If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                        Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                         Return "Error"
                     }
@@ -465,34 +466,31 @@ Function Get-LogicMonitorConfigSourceData {
                     $i++
 
                     $message = ("{0}: Getting the most recent config backup for instance {1}. This is instance {2} of {3}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $instance.id, $i, $instances.items.Count)
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                     $resourcePath = "/device/devices/$DeviceId/devicedatasources/$($cs.id)/instances/$($instance.id)/config"
 
                     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-                    # Get current time in milliseconds
+                    #region Auth and headers
+                    # Get current time in milliseconds.
                     $epoch = [Math]::Round((New-TimeSpan -Start (Get-Date -Date "1/1/1970") -End (Get-Date).ToUniversalTime()).TotalMilliseconds)
-
-                    # Concatenate Request Details
                     $requestVars = $httpVerb + $epoch + $resourcePath
-
-                    # Construct Signature
                     $hmac = New-Object System.Security.Cryptography.HMACSHA256
                     $hmac.Key = [Text.Encoding]::UTF8.GetBytes([System.Runtime.InteropServices.Marshal]::PtrToStringAuto(([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($AccessKey))))
                     $signatureBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($requestVars))
                     $signatureHex = [System.BitConverter]::ToString($signatureBytes) -replace '-'
                     $signature = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($signatureHex.ToLower()))
 
-                    # Construct Headers
                     $headers = @{
                         "Authorization" = "LMv1 $AccessId`:$signature`:$epoch"
                         "Content-Type"  = "application/json"
-                        "X-Version"     = 2
+                        "X-Version"     = 3
                     }
+                    #endregion Auth and headers
 
                     $message = ("{0}: Executing REST query to get config backup." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-                    If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                     $stopLoop = $false
                     Do {
@@ -502,7 +500,7 @@ Function Get-LogicMonitorConfigSourceData {
                         } Catch {
                             If ($_.Exception.Message -match '429') {
                                 $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-                                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Warning -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Warning -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Warning -Message $message }
+                                Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
                                 Start-Sleep -Seconds 60
                             } Else {
@@ -515,7 +513,7 @@ Function Get-LogicMonitorConfigSourceData {
                                     ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage -ErrorAction SilentlyContinue),
                                     ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode -ErrorAction SilentlyContinue), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                                 )
-                                If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Error -Message $message -BlockStdErr $BlockStdErr } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Error -Message $message -BlockStdErr $BlockStdErr } Else { Out-PsLogging -ScreenOnly -MessageType Error -Message $message -BlockStdErr $BlockStdErr }
+                                Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                                 Return "Error"
                             }
@@ -525,7 +523,7 @@ Function Get-LogicMonitorConfigSourceData {
 
                     If ($data.items) {
                         $message = ("{0}: Retrieved {1} backups. Returning {2} backups." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $data.items.id.Count, $EntryCount)
-                        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+                        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                         If ($EntryCount -eq "All") {
                             $data.items | Sort-Object -Property pollTimestamp -Descending # Sorted this way, the newest backup is first in the list.
@@ -543,9 +541,9 @@ Function Get-LogicMonitorConfigSourceData {
     }
     Else {
         $message = ("{0}: No ConfigSources discovered. No further work for {1} to do." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        If ($PSBoundParameters['Verbose'] -or $VerbosePreference -eq 'Continue') { If ($EventLogSource -and (-NOT $LogPath)) { Out-PsLogging -EventLogSource $EventLogSource -MessageType Verbose -Message $message } ElseIf ($LogPath -and (-NOT $EventLogSource)) { Out-PsLogging -LogPath $LogPath -MessageType Verbose -Message $message } Else { Out-PsLogging -ScreenOnly -MessageType Verbose -Message $message } }
+        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         Return
     }
     #endregion Get data
-} #1.0.0.4
+} #2023.06.12.0
