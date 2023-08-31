@@ -19,6 +19,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
             V1.0.0.8 date: 23 July 2020
             V2023.04.07.0
             V2023.06.12.0
+            V2023.08.31.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -173,7 +174,7 @@ Function Get-LogicMonitorCollectorAvailableVersion {
         While ($stopLoop -eq $false)
 
         If ($response.items.Count -gt 0) {
-            $message = ("{0}: Retrieved {1} version of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
+            $message = ("{0}: Retrieved {1} versions out of {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $response.items.Count, $response.total)
             If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
             Foreach ($item in $response.items) {
@@ -211,4 +212,4 @@ Function Get-LogicMonitorCollectorAvailableVersion {
     #region Output
     Return $versions
     #endregion Output
-} #2023.06.12.0
+} #2023.08.31.0
