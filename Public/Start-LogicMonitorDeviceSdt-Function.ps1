@@ -31,6 +31,7 @@
             V2023.04.28.0
             V2023.05.19.0
             V2023.08.22.0
+            V2023.09.11.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -73,35 +74,35 @@
     [CmdletBinding()]
     Param (
         [Parameter(Mandatory)]
-        [string]$AccessId,
+        [String]$AccessId,
 
         [Parameter(Mandatory)]
-        [securestring]$AccessKey,
+        [SecureString]$AccessKey,
 
         [Parameter(Mandatory)]
-        [string]$AccountName,
+        [String]$AccountName,
 
         [Parameter(Mandatory, ParameterSetName = "Id", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
-        [string]$Id,
+        [String]$Id,
 
         [Parameter(Mandatory, ParameterSetName = "Name", ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
-        [string]$DisplayName,
+        [String]$DisplayName,
 
-        [datetime]$StartDate,
+        [DateTime]$StartDate,
 
         [ValidateScript( { $_ -match '^([01]\d|2[0-3]):?([0-5]\d)$' })]
-        [string]$StartTime,
+        [String]$StartTime,
 
         [ValidateScript( { $_ -match '^\d{1,3}:([01]?[0-9]|2[0-3]):([0-5][0-9])$' })]
-        [string]$Duration = "00:01:00",
+        [String]$Duration = "00:01:00",
 
-        [string]$Comment,
+        [String]$Comment,
 
-        [boolean]$BlockStdErr = $false,
+        [Boolean]$BlockStdErr = $false,
 
-        [string]$EventLogSource,
+        [String]$EventLogSource,
 
-        [string]$LogPath
+        [String]$LogPath
     )
 
     Begin {
@@ -235,7 +236,7 @@
         #endregion Build data
 
         #region Execute REST query
-        $data = $($Properties | ConvertTo-Json -Depth 5)
+        $data = $($data | ConvertTo-Json -Depth 5)
 
         #region Auth and headers
         # Get current time in milliseconds.
@@ -302,4 +303,4 @@
         }
         #endregion Execute REST query
     }
-} #2023.08.22.0
+} #2023.09.11.0
