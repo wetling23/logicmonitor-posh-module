@@ -10,6 +10,7 @@ Function Get-LogicMonitorDeviceGroup {
             V1.0.0.1 date: 30 July 2021
             V2023.04.10.0
             V2023.04.28.0
+            V2023.09.22.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -146,7 +147,8 @@ Function Get-LogicMonitorDeviceGroup {
         $Name = $Name.Replace('%', '%25').Replace('&', '%26').Replace('$', '%24').Replace('+', '%28').Replace(',', '%2C').Replace('/', '%2F').Replace(':', '%3A').Replace(';', '%3B').Replace('=', '%3D').Replace('?', '%3F').Replace('@', '%40').Replace(' ', '%20').Replace('"', '%22').Replace('<', '%3C').Replace('>', '%3E').Replace('#', '%23').Replace('{', '%7B').Replace('}', '%7D').Replace('|', '%7C').Replace('\', '%5C').Replace('^', '%5E').Replace('~', '%7E').Replace('[', '%5B').Replace(']', '%5D')
     }
 
-    If ($Filter -match $pattern1) {
+    <#If ($Filter -match $pattern1) {
+        This is not needed, but I may use it in the future.
         $message = ("{0}: URL encoding special characters in the filter." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
         If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
@@ -161,7 +163,7 @@ Function Get-LogicMonitorDeviceGroup {
 
         $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
         If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-    }
+    }#>
 
     Do {
         Switch ($PsCmdlet.ParameterSetName) {
@@ -291,4 +293,4 @@ Function Get-LogicMonitorDeviceGroup {
     Until (($stopLoop -eq $true) -or ($singleDeviceGroupCheckDone))
 
     $deviceGroups
-} #2023.04.28.0
+} #2023.09.22.0

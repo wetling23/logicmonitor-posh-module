@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.11.0'
+ModuleVersion = '2023.09.22.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -149,7 +149,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Fixed https://github.com/wetling23/logicmonitor-posh-module/issues/26.'
+            ReleaseNotes = 'Commented-out unused block of code in Get-LogicMonitorDeviceGroup.'
 
         # Prerelease string of this module
         # Prerelease = ''
