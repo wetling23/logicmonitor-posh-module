@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.22.0'
+ModuleVersion = '2023.09.22.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -75,6 +75,7 @@ FunctionsToExport = 'Add-EventLogSource',
                 'Get-LogicMonitorAlert', 'Get-LogicMonitorAlertRule',
                 'Get-LogicMonitorAuditLog', 'Get-LogicMonitorCollector',
                 'Get-LogicMonitorCollectorAvailableVersion',
+                'Get-LogicMonitorCollectorGroup',
                 'Get-LogicMonitorCollectorInstaller',
                 'Get-LogicMonitorCollectorUpgradeHistory',
                 'Get-LogicMonitorConfigSource', 'Get-LogicMonitorConfigSourceData',
@@ -149,7 +150,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Commented-out unused block of code in Get-LogicMonitorDeviceGroup.'
+            ReleaseNotes = 'Added Get-LogicMonitorCollectorGroup.'
 
         # Prerelease string of this module
         # Prerelease = ''
