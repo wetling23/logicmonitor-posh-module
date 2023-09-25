@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.22.1'
+ModuleVersion = '2023.09.25.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -90,8 +90,7 @@ FunctionsToExport = 'Add-EventLogSource',
                 'Get-LogicMonitorPropertySource', 'Get-LogicMonitorRawData',
                 'Get-LogicMonitorReport','Get-LogicMonitorReportGroup',
                 'Get-LogicMonitorRole', 'Get-LogicMonitorSdt', 'Get-LogicMonitorTopology',
-                'Get-LogicMonitorUser', 'Get-LogicMonitorUserRole',
-                'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup',
+                'Get-LogicMonitorUser', 'Get-LogicMonitorWebsite', 'Get-LogicMonitorWebsiteGroup',
                 'Get-LogicMonitorWebsiteProperty',
                 'New-LogicMonitorAlertRule', 'New-LogicMonitorCollector',
                 'New-LogicMonitorDashboard', 'New-LogicMonitorDashboardGroup',
@@ -104,8 +103,8 @@ FunctionsToExport = 'Add-EventLogSource',
                 'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDashboardGroup',
                 'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceGroup',
                 'Remove-LogicMonitorDeviceGroupProperty', 'Remove-LogicMonitorDeviceProperty',
-                'Remove-LogicMonitorSdt', 'Remove-LogicMonitorUser',
-                'Remove-LogicMonitorWebsiteGroup',
+                'Remove-LogicMonitorReport', 'Remove-LogicMonitorRole','Remove-LogicMonitorSdt',
+                'Remove-LogicMonitorUser', 'Remove-LogicMonitorWebsiteGroup',
                 'Send-LogicMonitorLmLogEntry',
                 'Start-LogicMonitorDeviceSdt',
                 'Update-LogicMonitorAlertRule', 'Update-LogicMonitorCollectorProperty',
@@ -150,7 +149,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Added Get-LogicMonitorCollectorGroup.'
+            ReleaseNotes = 'Upated Get-LogicMonitorReport (streamlined code, added examples). Upated Remove-LogicMonitorAlertRule (fixed bug in Name parameter set). Added Remove-LogicMonitorReport, Remove-LogicMonitorReportGroup, and Remove-LogicMonitorRole. Consolidated Get-LogicMonitorUserRole into Get-LogicMonitorRole.'
 
         # Prerelease string of this module
         # Prerelease = ''

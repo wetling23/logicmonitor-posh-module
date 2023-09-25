@@ -7,6 +7,7 @@
             V1.0.0.0 date: 8 September 2020
             V2023.04.28.0
             V2023.08.23.0
+            V2023.09.25.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -66,6 +67,11 @@
     $AllProtocols = [System.Net.SecurityProtocolType]'Tls11,Tls12'
     [System.Net.ServicePointManager]::SecurityProtocol = $AllProtocols
 
+    $commandParams = @{
+        AccountName = $AccountName
+        AccessKey   = $AccessKey
+        AccessId    = $AccessId
+    }
     #endregion Initialize variables
 
     #region Logging
@@ -118,8 +124,7 @@
 
             If ($response.id) {
                 $resourcePath += "/$($response.Id)"
-            }
-            Else {
+            } Else {
                 $message = ("{0}: No alert rule was returned when searching for {1}. To prevent errors, {2} will exit." `
                         -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Name, $MyInvocation.MyCommand)
                 Out-PsLogging @loggingParams -MessageType Error -Message $message
@@ -182,4 +187,4 @@
     } While ($stopLoop -eq $false)
 
     Return $response
-} #2023.08.23.0
+} #2023.09.25.0

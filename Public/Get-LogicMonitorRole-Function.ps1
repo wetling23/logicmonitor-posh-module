@@ -48,7 +48,7 @@
             In this example, the command gets the properties of the role with name "readonly". Limited logging output is sent to the host and C:\Temp\log.txt.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllRoles')]
-    [alias('Get-LogicMonitorRoles')]
+    [alias('Get-LogicMonitorRoles', 'Get-LogicMonitorUserRoles', 'Get-LogicMonitorUserRole')]
     Param (
         [Parameter(Mandatory)]
         [String]$AccessId,
