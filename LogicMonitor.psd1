@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.26.0'
+ModuleVersion = '2023.09.26.1'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -103,8 +103,9 @@ FunctionsToExport = 'Add-EventLogSource',
                 'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDashboardGroup',
                 'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceGroup',
                 'Remove-LogicMonitorDeviceGroupProperty', 'Remove-LogicMonitorDeviceProperty',
-                'Remove-LogicMonitorReport', 'Remove-LogicMonitorRole','Remove-LogicMonitorSdt',
-                'Remove-LogicMonitorUser', 'Remove-LogicMonitorWebsiteGroup',
+                'Remove-LogicMonitorReport', 'Remove-LogicMonitorReportGroup',
+                'Remove-LogicMonitorRole','Remove-LogicMonitorSdt', 'Remove-LogicMonitorUser',
+                'Remove-LogicMonitorWebsiteGroup',
                 'Send-LogicMonitorLmLogEntry',
                 'Start-LogicMonitorDeviceSdt',
                 'Update-LogicMonitorAlertRule', 'Update-LogicMonitorCollectorProperty',
@@ -149,7 +150,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitorRole (fixed filter parsing bug).'
+            ReleaseNotes = 'Added Remove-LogicMonitorReportGroup.'
 
         # Prerelease string of this module
         # Prerelease = ''
