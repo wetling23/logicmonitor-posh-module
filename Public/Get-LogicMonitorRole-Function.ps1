@@ -18,6 +18,7 @@
             V2023.04.28.0
             V2023.05.09.0
             V2023.08.23.0
+            V2023.09.26.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -140,7 +141,7 @@
                 If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
                 $regex.Matches($Filter) | ForEach-Object {
-                    $Filter = $Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value))
+                    $Filter = ($Filter -replace ([regex]::Escape($_.Groups[1].value)), ([uri]::EscapeDataString($_.Groups[1].value)) -replace 'filter=')
                 }
 
                 $message = ("{0}: After parsing, the filter is: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Filter)
@@ -249,4 +250,4 @@
     } Until (($response.total -eq $roles.id.Count) -or ($response.id.Count -eq $roles.id.Count))
 
     Return $roles
-} #2023.08.23.0
+} #2023.09.26.0

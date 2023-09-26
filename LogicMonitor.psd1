@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.25.0'
+ModuleVersion = '2023.09.26.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -149,7 +149,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Upated Get-LogicMonitorReport (streamlined code, added examples). Upated Remove-LogicMonitorAlertRule (fixed bug in Name parameter set). Added Remove-LogicMonitorReport, Remove-LogicMonitorReportGroup, and Remove-LogicMonitorRole. Consolidated Get-LogicMonitorUserRole into Get-LogicMonitorRole.'
+            ReleaseNotes = 'Updated Get-LogicMonitorRole (fixed filter parsing bug).'
 
         # Prerelease string of this module
         # Prerelease = ''
