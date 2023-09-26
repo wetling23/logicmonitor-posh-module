@@ -7,6 +7,7 @@
             V1.0.0.0 date: 21 April 2022
             V2023.05.09.0
             V2023.06.05.0
+            V2023.09.26.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -39,6 +40,10 @@
             PS C:\> Get-LogicMonitorUser -AccessID <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=apionly:"False"' -Verbose
 
             In this example, the command gets the properties of all users with the apionly property equal to "False". Verbose logging output is sent only to the host.
+        .EXAMPLE
+            PS C:\> Get-LogicMonitorUser -AccessID <accessID> -AccessKey <accessKey> -AccountName <accountName> -Filter 'filter=roles.id:7' -Verbose
+
+            In this example, the command gets the properties of all users assigned to role ID 7. Verbose logging output is sent only to the host.
     #>
     [CmdletBinding(DefaultParameterSetName = 'AllUsers')]
     Param (
@@ -250,4 +255,4 @@
     #region Output
     Return $users
     #endregion Output
-} #2023.06.05.0
+} #2023.09.26.0
