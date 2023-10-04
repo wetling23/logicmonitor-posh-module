@@ -11,6 +11,7 @@ Function Remove-LogicMonitorDeviceGroup {
             V1.0.0.2 date: 30 September 2021
             V2023.04.28.0
             V2023.08.23.0
+            V2023.10.04.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -49,7 +50,7 @@ Function Remove-LogicMonitorDeviceGroup {
 
             In this example, the function will remove the device Bar (and its subgroups) within Foo path. Note: Sort-Object is used to make sure we delete the children first. If the parent is deleted first, an error will be generated, because the child no longer exists.
         .EXAMPLE
-            PS C:\> Get-LogicMonitorDeviceGroup -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> | ? fullpath -like "Foo/Bar*" | Remove-LogicMonitorDeviceGroup
+            PS C:\> Get-LogicMonitorDeviceGroup -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName> | ? fullpath -like "Foo/Bar*" | Remove-LogicMonitorDeviceGroup -AccessId <accessId> -AccessKey <accessKey> -AccountName <accountName>
 
             In this example, the function will remove the device groups named Bar* within Foo path. Note: If there are subfolders, it could potentially fail, so better sort it by desc first so the most nested groups get removed first.
     #>
