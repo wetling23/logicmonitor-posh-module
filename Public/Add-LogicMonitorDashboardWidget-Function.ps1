@@ -11,6 +11,7 @@
             V1.0.0.3 date: 21 September 2021
             V2023.06.07.0
             V2023.08.25.0
+            V2024.05.02.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -28,7 +29,7 @@
         .PARAMETER LogPath
             When included (when EventLogSource is null), represents the file, to which the cmdlet will output will be logged. If no path or event log source are provided, output is sent only to the host.
         .EXAMPLE
-            PS C:\> $table = @{name = 'widget1'; dashboardId = 1}
+            PS C:\> $table = [PsCustomObject]@{name = 'widget1'; dashboardId = 1}
             PS C:\> Add-LogicMonitorDashboard -AccessId <access Id> -AccessKey <access key> -AccountName <account name> -Properties $table
 
             In this example, the function will create a new dashboard widget with the following properties:
@@ -36,7 +37,7 @@
                 - Dashboard ID: 1
             Limited logging output is sent to the host.
         .EXAMPLE
-            PS C:\> $table = @{
+            PS C:\> $table = [PsCustomObject]@{
                         name = 'widget1'
                         dashboardId = 1
                         type = 'text'
@@ -69,7 +70,7 @@
         [String]$AccountName,
 
         [Parameter(Mandatory)]
-        [Hashtable]$Properties,
+        [PSCustomObject]$Properties,
 
         [Boolean]$BlockStdErr = $false,
 
@@ -119,16 +120,14 @@
     }
     #endregion Logging
 
-    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    $message = ("{0}: Beginning {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
     #endregion Setup
 
     #region Validate input properties
     # Checking for the required properties
     Foreach ($prop in $requiredProps) {
-        If (-NOT($Properties.Contains($prop))) {
-            $message = ("{0}: Missing required property: {1}. Please update the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $prop)
-            Out-PsLogging @loggingParams -MessageType Error -Message $message
+        If (-NOT($Properties.$prop)) {
+            $message = ("{0}: Missing required property: {1}. Please update the -Filter parameter and try again." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $prop); Out-PsLogging @loggingParams -MessageType Error -Message $message
 
             Return "Error"
         }
@@ -141,8 +140,7 @@
     # Construct the query URL.
     $url = "https://$AccountName.logicmonitor.com/santaba/rest$resourcePath"
 
-    $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url)
-    If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+    $message = ("{0}: Connecting to: {1}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $url); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
     #region Auth and headers
     # Get current time in milliseconds.
@@ -166,8 +164,7 @@
     }
     Catch {
         If ($_.Exception.Message -match '429') {
-            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message)
-            Out-PsLogging @loggingParams -MessageType Warning -Message $message
+            $message = ("{0}: Rate limit exceeded, retrying in 60 seconds." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $_.Exception.Message); Out-PsLogging @loggingParams -MessageType Warning -Message $message
 
             Start-Sleep -Seconds 60
         }
@@ -181,8 +178,7 @@
                 Invoke-Request: {4}`r
                 Headers: {5}" -f
                 ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $Properties.Name, $errormsg, $errorcode, $_.Exception.Message, ($headers | Out-String)
-            )
-            Out-PsLogging @loggingParams -MessageType Error -Message $message
+            ); Out-PsLogging @loggingParams -MessageType Error -Message $message
         }
 
         Return "Error"
@@ -190,15 +186,13 @@
 
     #region Output
     If ($response.id) {
-        $message = ("{0}: Successfully created the dashboard widget in LogicMonitor." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"))
-        If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
+        $message = ("{0}: Successfully created the dashboard widget in LogicMonitor." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss")); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
     } Else {
-        $message = ("{0}: Unexpected error creating an dashboard widget in LogicMonitor. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand)
-        Out-PsLogging @loggingParams -MessageType Error -Message $message
+        $message = ("{0}: Unexpected error creating an dashboard widget in LogicMonitor. To prevent errors, {1} will exit." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand); Out-PsLogging @loggingParams -MessageType Error -Message $message
 
         Return "Error"
     }
 
     Return $response
     #endregion Output
-} #2023.08.25.0
+} #2024.05.02.0

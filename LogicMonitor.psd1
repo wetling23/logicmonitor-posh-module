@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2023.09.26.1'
+ModuleVersion = '2024.05.30.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -70,6 +70,7 @@ PowerShellVersion = '5.0'
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = 'Add-EventLogSource',
+                'Copy-LogicMonitorDashboard',
                 'Disable-LogicMonitorLogicModuleInstance',
                 'Enable-LogicMonitorLogicModuleInstance',
                 'Get-LogicMonitorAlert', 'Get-LogicMonitorAlertRule',
@@ -150,7 +151,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Added Remove-LogicMonitorReportGroup.'
+            ReleaseNotes = 'Possibly several updates. Main update is to Get-LogicMonitor alert. Removed some parameters and updated the loop to better support LogicMonitor functionality.'
 
         # Prerelease string of this module
         # Prerelease = ''
