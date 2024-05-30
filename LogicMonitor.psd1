@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2024.05.30.2'
+ModuleVersion = '2024.05.30.3'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()

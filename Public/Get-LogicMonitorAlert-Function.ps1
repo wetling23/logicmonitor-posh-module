@@ -280,8 +280,8 @@ Function Get-LogicMonitorAlert {
                 Invoke-Request: {4}`r
                 Headers: {5}`r
                 Body: {6}" -f
-                ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $(If () { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) }),
-                ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
+                ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $(Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) } Catch { '' }),
+                    $(Try { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode) } Catch { '' }), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                 ); Out-PsLogging @loggingParams -MessageType Error -Message $message
 
                 Return "Error"
