@@ -15,6 +15,7 @@ Function Get-LogicMonitorAlert {
             V2023.06.10.0
             V2023.08.27.0
             V2024.05.30.0
+            V2024.05.30.1
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -263,7 +264,7 @@ Function Get-LogicMonitorAlert {
         $message = ("{0}: Connecting to: {1}." -f ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $params.Uri); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
 
         Try {
-            $response = Invoke-RestMethod -Uri $url -Method $httpVerb -Header $headers -ErrorAction Stop
+            $response = Invoke-RestMethod @params
 
             $stopLoop = $true
         } Catch {
@@ -278,7 +279,7 @@ Function Get-LogicMonitorAlert {
                 Invoke-Request: {4}`r
                 Headers: {5}`r
                 Body: {6}" -f
-                ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage),
+                ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $MyInvocation.MyCommand, $(If () { ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorMessage) }),
                 ($_ | ConvertFrom-Json -ErrorAction SilentlyContinue | Select-Object -ExpandProperty errorCode), $_.Exception.Message, ($headers | Out-String), ($data | Out-String)
                 ); Out-PsLogging @loggingParams -MessageType Error -Message $message
 
