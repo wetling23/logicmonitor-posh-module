@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2024.05.30.1'
+ModuleVersion = '2024.05.30.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -151,7 +151,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Fixed parameter bug in Get-LogicMonitorAlert.'
+            ReleaseNotes = 'Updated in-line doc for Get-LogicMonitorAlert.'
 
         # Prerelease string of this module
         # Prerelease = ''

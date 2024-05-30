@@ -16,6 +16,7 @@ Function Get-LogicMonitorAlert {
             V2023.08.27.0
             V2024.05.30.0
             V2024.05.30.1
+            V2024.05.30.2
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -25,9 +26,9 @@ Function Get-LogicMonitorAlert {
         .PARAMETER AccountName
             Represents the subdomain of the LogicMonitor customer.
         .PARAMETER Cleared
-
+            Represents the desired clear state.
         .PARAMETER All
-
+            When included, the cmdlet will get all alerts started in the past one hour (minus any filtered out by -Cleared).
         .PARAMETER Filter
             Represents a hashtable of filterable alert properties and the value, for which to filter. Valid values are:
                 'id', 'type', 'acked', 'rule', 'chain', 'severity', 'cleared', 'sdted', 'monitorObjectName', 'monitorObjectGroups', 'resourceTemplateName', 'instanceName', 'dataPointName'
