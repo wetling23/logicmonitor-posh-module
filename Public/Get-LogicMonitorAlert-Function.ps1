@@ -17,6 +17,7 @@ Function Get-LogicMonitorAlert {
             V2024.05.30.0
             V2024.05.30.1
             V2024.05.30.2
+            V2024.06.04.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -229,7 +230,7 @@ Function Get-LogicMonitorAlert {
         $filterString = $filterList -join ','
     } ElseIf ($Filter) {
         # If the filter includes cleared:false or cleared:"false", make sure to remove "endEpoch" and its value.
-        $filterString = [System.Net.WebUtility]::UrlEncode($(If ($Filter -match '(cleared:"false"|cleared:false|cleared:"")') { ((($Filter -replace 'startEpoch') -replace ',,', ',') -replace '(cleared:["]false["]|cleared:false)', 'cleared:""').TrimEnd(',').TrimStart(',') -replace "^filter=" } Else { $Filter.TrimStart(',') -replace "^filter=" }))
+        $filterString = [System.Net.WebUtility]::UrlEncode($(If ($Filter -match '(cleared:"false"|cleared:false|cleared:"")') { ((($Filter -replace 'endEpoch') -replace ',,', ',') -replace '(cleared:"false"|cleared:false)', 'cleared:""').TrimEnd(',').TrimStart(',') -replace "^filter=" } Else { $Filter.TrimStart(',') -replace "^filter=" }))
     }
 
     $message = ("{0}: Encoded filter: {1}." -f ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $filterString); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
@@ -294,7 +295,7 @@ Function Get-LogicMonitorAlert {
             $message = ("{0}: Retrieved {1} items so far." -f ([DateTime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $alerts.id.Count); If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
         }
 
-        If (($response.total -match '-') -or ($response.total -gt $alerts.id.Count)) {
+        If (($response.total -match '-\d+') -or ($response.total -gt $alerts.id.Count)) {
             $offset += $BatchSize
             $stopLoop = $false
         } ElseIf ($response.total -eq 0) {
