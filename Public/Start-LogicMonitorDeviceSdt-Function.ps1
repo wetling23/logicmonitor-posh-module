@@ -32,6 +32,7 @@
             V2023.05.19.0
             V2023.08.22.0
             V2023.09.11.0
+            V2025.04.10.0
         .LINK
             https://github.com/wetling23/logicmonitor-posh-module
         .PARAMETER AccessId
@@ -176,11 +177,8 @@
         }
         ElseIf (($StartDate) -and -NOT($StartTime)) {
             # Start date is provided. Start time is not provided.
-            $message = ("{0}: StartDate is {1} and StartTime is null. The object type of StartDate is {2}" -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, $StartDate.GetType())
+            $message = ("{0}: StartDate is {1} and StartTime is null, using {2}." -f ([datetime]::Now).ToString("yyyy-MM-dd`THH:mm:ss"), $StartDate, "$("{0:D2}" -f $StartDate.Hour):$("{0:D2}" -f $StartDate.Minute)")
             If ($loggingParams.Verbose) { Out-PsLogging @loggingParams -MessageType Verbose -Message $message }
-
-            $currentTime = (Get-Date).AddMinutes(1)
-            $StartDate = $StartDate.Date.Add((New-Timespan -Hour $currentTime.Hour -Minute $currentTime.Minute))
         }
         Else {
             # Start date is provided. Start time is provided.
@@ -303,4 +301,4 @@
         }
         #endregion Execute REST query
     }
-} #2023.09.11.0
+} #2025.04.10.0

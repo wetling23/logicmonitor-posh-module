@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2024.06.05.0'
+ModuleVersion = '2025.04.10.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -27,7 +27,7 @@ Author = 'Mike Hashemi'
 CompanyName = ''
 
 # Copyright statement for this module
-Copyright = '(c) 2023 mhashemi. All rights reserved.'
+Copyright = '(c) 2025 mhashemi. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'LogicMonitor REST API-related functions.'
@@ -151,7 +151,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Get-LogicMonitorAlert (Fixed bug in filterString validation).'
+            ReleaseNotes = 'Updated Start-LogicMonitorDeviceSdt to 2025.04.10.0 (changed the way the cmdlet handles a lack of -StartTime).'
 
         # Prerelease string of this module
         # Prerelease = ''
