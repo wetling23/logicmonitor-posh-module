@@ -12,7 +12,7 @@
 RootModule = 'LogicMonitor.psm1'
 
 # Version number of this module.
-ModuleVersion = '2025.04.10.0'
+ModuleVersion = '2025.08.08.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -102,11 +102,11 @@ FunctionsToExport = 'Add-EventLogSource',
                 'Out-PsLogging',
                 'Remove-LogicMonitorAlertRule', 'Remove-LogicMonitorCollector',
                 'Remove-LogicMonitorCollectorVersion', 'Remove-LogicMonitorDashboardGroup',
-                'Remove-LogicMonitorDevice', 'Remove-LogicMonitorDeviceGroup',
-                'Remove-LogicMonitorDeviceGroupProperty', 'Remove-LogicMonitorDeviceProperty',
-                'Remove-LogicMonitorReport', 'Remove-LogicMonitorReportGroup',
-                'Remove-LogicMonitorRole','Remove-LogicMonitorSdt', 'Remove-LogicMonitorUser',
-                'Remove-LogicMonitorWebsiteGroup',
+                'Remove-LogicMonitorDashboardWidget', 'Remove-LogicMonitorDevice',
+                'Remove-LogicMonitorDeviceGroup', 'Remove-LogicMonitorDeviceGroupProperty',
+                'Remove-LogicMonitorDeviceProperty', 'Remove-LogicMonitorReport',
+                'Remove-LogicMonitorReportGroup', 'Remove-LogicMonitorRole','Remove-LogicMonitorSdt',
+                'Remove-LogicMonitorUser', 'Remove-LogicMonitorWebsiteGroup',
                 'Send-LogicMonitorLmLogEntry',
                 'Start-LogicMonitorDeviceSdt',
                 'Update-LogicMonitorAlertRule', 'Update-LogicMonitorCollectorProperty',
@@ -151,7 +151,7 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-            ReleaseNotes = 'Updated Start-LogicMonitorDeviceSdt to 2025.04.10.0 (changed the way the cmdlet handles a lack of -StartTime).'
+            ReleaseNotes = 'Added Remove-LogicMonitorDashboardWidget.'
 
         # Prerelease string of this module
         # Prerelease = ''
